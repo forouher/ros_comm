@@ -72,6 +72,7 @@ import rospy.names
 import rospy.rostime
 
 import rospy.impl.tcpros
+import rospy.impl.kdbus
 
 from rospy.core import *
 from rospy.impl.paramserver import get_param_server_cache
@@ -188,10 +189,13 @@ class ROSHandler(XmlRpcHandler):
 
         # initialize protocol handlers. The master will not have any.
         self.protocol_handlers = []
-        handler = rospy.impl.tcpros.get_tcpros_handler()
-        if handler is not None:
-            self.protocol_handlers.append(handler)
+        handler_kdbus = rospy.impl.kdbus.get_kdbus_handler()
+        if handler_kdbus is not None:
+            self.protocol_handlers.append(handler_kdbus)
             
+        handler_tcpros = rospy.impl.tcpros.get_tcpros_handler()
+        if handler_tcpros is not None:
+            self.protocol_handlers.append(handler_tcpros)
         self.reg_man = RegManager(self)
 
     ###############################################################################

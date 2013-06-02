@@ -52,6 +52,7 @@ from ..names import _set_caller_id
 from ..core import is_shutdown, signal_shutdown, rospyerr
 
 from .tcpros import init_tcpros
+from .kdbus import init_kdbus
 from .masterslave import ROSHandler
 
 DEFAULT_NODE_PORT = 0 #bind to any open port
@@ -86,6 +87,7 @@ def start_node(environ, resolved_name, master_uri=None, port=0, tcpros_port=0):
     @raise ROSInitException: if node has already been started
     """
     init_tcpros(tcpros_port)
+    init_kdbus()
     if not master_uri:
         master_uri = rosgraph.get_master_uri()
     if not master_uri:
