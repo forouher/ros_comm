@@ -506,6 +506,8 @@ class Subscriber(Topic):
             self.impl.set_queue_size(queue_size)
         if buff_size != DEFAULT_BUFF_SIZE:
             self.impl.set_buff_size(buff_size)
+            
+        # TODO: add here another callback, that does our statistics stuff
 
         if callback is not None:
             # #1852
@@ -727,6 +729,74 @@ class SubscribeListener(object):
         """
         pass
 
+
+class SubscriberStatisticLogger():
+    """
+    Class that monitors lots of stuff on each subscriber.
+    
+    is created whenever a subscriber is created.
+    is destroyed whenever its parent subscriber is destroyed.
+    its lifecycle is therefore bound to its parent subscriber.
+    
+    XXX: the are threading/concurrent access issues meantioned at different
+    places. what do i have to keep in mind?
+    - may there be callbacks called in parallel? sounds unlikely
+    - may additional methods (which i don't have any a.t.m., be called in
+      parallel? probably.
+
+    """
+
+    def __init__(self, subscriber):
+        """
+        Constructor: TODO
+        
+        - spawn a publisher thread
+        - add itself/the callback as a callback to the subscriber
+        - handle thread lifecycles (especally destruction)
+        """
+        pass
+
+    def sendStatistics(self):
+	"""
+	stuff to publish
+	- message frequency
+	- message variance
+	- message drops/buffer overflow (counter)
+	- delta time (diff header.stamp - now())
+	- call hooks to do deep packet inspection? (later)
+	
+	create a new message type for this. while this is similar to
+	diagnostics, it is
+	a) too much string-based
+	b) REP 107 restricts it to drivers (should double check that)
+	c) might be hard to extend
+	"""
+
+    def callback(self):
+        """
+        Callback: TODO
+        
+        needs to know:
+        - packet content (data)
+        - all secret meta data there might be (time of arrival?)
+        - topic message type (at least, if there is a header)
+        - subscriber topic name
+        - publisher topic name (on publisher side, ignoring remapping stuff)
+          - these two are likely needed to create the graph.
+          - buffer size (to measure message drops or similar)
+        
+        any computing-heavy stuff should likely be done somewhere else,
+        as this callback will probably block the other callbacks?
+        
+        XXX: idea: can I call this callback *last*? this would allow me to
+        also measure the callback runtime of the subscriber (unless it does
+        its computation async)
+        
+        this callback will keep some statistics and publish the results
+        periodically on a topic. the publishing should probably be done
+        asynchronically in another thread.
+        """
+        pass
 
 #  Implementation note: Publisher attaches to a
 #  _PublisherImpl singleton for that topic.  The underlying impl
