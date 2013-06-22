@@ -1,7 +1,9 @@
 # Software License Agreement (BSD License)
 #
-# Copyright (c) 2008, Willow Garage, Inc.
+# Copyright (c) 2013 Dariush Forouher
 # All rights reserved.
+#
+# Based on code adapted from diagnostics_updater by Blaise Gassend
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -102,6 +104,13 @@ class SubscriberStatisticsLogger():
 	self.pub = rospy.Publisher("/statistics", TopicStatistics)
 	self.last_pub_time = rospy.Time.now()
 	self.pub_frequency = rospy.Duration(1.0)
+	
+	self.window_size_ = 7
+	self.count_ = 0
+	self.seq_nums_ = [self.count_ for x in range(self.window_size_)]
+	self.times_ = [self.last_pub_time for x in range(self.window_size_)]
+	self.hist_indx_ = 0
+
         pass
 
     def sendStatistics(self):
@@ -120,10 +129,22 @@ class SubscriberStatisticsLogger():
 	b) REP 107 restricts it to drivers (should double check that)
 	c) might be hard to extend
 	"""
+	
+	curtime = rospy.Time.now()
+        curseq = self.count_
+        events = curseq - self.seq_nums_[self.hist_indx_]
+        window = (curtime - self.times_[self.hist_indx_]).to_sec()
+        freq = events / window
+        self.seq_nums_[self.hist_indx_] = curseq
+        self.times_[self.hist_indx_] = curtime
+        self.hist_indx_ = (self.hist_indx_ + 1) % self.window_size_
+
+	
 	msg = TopicStatistics()
 	msg.header.stamp = rospy.Time.now()
 	msg.topic = self.subscriber.name
 	msg.node_sub = rospy.get_name()
+	msg.frequency = freq
 	self.pub.publish(msg)
 
     def get_callback(self):
@@ -158,6 +179,7 @@ class SubscriberStatisticsLogger():
         periodically on a topic. the publishing should probably be done
         asynchronically in another thread.
         """
+        self.count_ = self.count_ + 1
         if self.last_pub_time + self.pub_frequency < rospy.Time.now():
             self.sendStatistics()
             self.last_pub_time = rospy.Time.now()
