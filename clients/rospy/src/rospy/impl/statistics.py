@@ -106,10 +106,19 @@ class SubscriberStatisticsLogger():
 	self.pub_frequency = rospy.Duration(1.0)
 	
 	self.window_size_ = 7
+
+        # frequency
 	self.count_ = 0
 	self.seq_nums_ = [self.count_ for x in range(self.window_size_)]
 	self.times_ = [self.last_pub_time for x in range(self.window_size_)]
 	self.hist_indx_ = 0
+
+        # timestamp delay
+        self.delay_ = 0
+        self.delay_count_ = 0
+
+        self.last_seq_ = 0
+        self.dropped_msgs_ = 0
 
         pass
 
@@ -144,8 +153,14 @@ class SubscriberStatisticsLogger():
 	msg.header.stamp = rospy.Time.now()
 	msg.topic = self.subscriber.name
 	msg.node_sub = rospy.get_name()
-	msg.frequency = freq
-	self.pub.publish(msg)
+        msg.stamp_delay_mean = self.delay_ / self.delay_count_
+        msg.frequency_mean = freq
+        msg.dropped_msgs = self.dropped_msgs_
+        self.pub.publish(msg)
+
+        self.delay_count_ = 0
+        self.delay_ = 0
+        self.dropped_msgs_ = 0
 
     def get_callback(self):
 	return self.callback
@@ -179,7 +194,25 @@ class SubscriberStatisticsLogger():
         periodically on a topic. the publishing should probably be done
         asynchronically in another thread.
         """
+
+        # log for frequency
         self.count_ = self.count_ + 1
+
+        # log for stamp_delay
+        # TODO: maybe there's a better way than the exception
+        try:
+            self.delay_ = self.delay_ + (rospy.Time.now() - msg.header.stamp).to_sec()
+
+            if self.last_seq_ + 1 != msg.header.seq:
+                self.dropped_msgs_ = self.dropped_msgs_ + 1
+            self.last_seq_ = msg.header.seq
+
+        except:
+            pass
+
+        self.delay_count_ = self.delay_count_ + 1
+
+
         if self.last_pub_time + self.pub_frequency < rospy.Time.now():
             self.sendStatistics()
             self.last_pub_time = rospy.Time.now()

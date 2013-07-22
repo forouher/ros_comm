@@ -2,4 +2,8 @@ Header header
 string topic
 string node_pub
 string node_sub
-float32 frequency
+int32 dropped_msgs
+float32 frequency_mean
+float32 frequency_variance
+float32 stamp_delay_mean
+float32 stamp_delay_variance
