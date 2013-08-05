@@ -153,6 +153,7 @@ class SubscriberStatisticsLogger():
 	msg.header.stamp = rospy.Time.now()
 	msg.topic = self.subscriber.name
 	msg.node_sub = rospy.get_name()
+	msg.node_pub = self.publisher
         msg.stamp_delay_mean = self.delay_ / self.delay_count_
         msg.frequency_mean = freq
         msg.dropped_msgs = self.dropped_msgs_
@@ -168,7 +169,7 @@ class SubscriberStatisticsLogger():
     def get_callback_args(self):
 	return "" # TODO ???
 
-    def callback(self,msg,unknown):
+    def callback(self,msg,sub):
         """
         Callback: TODO
         
@@ -197,6 +198,8 @@ class SubscriberStatisticsLogger():
 
         # log for frequency
         self.count_ = self.count_ + 1
+
+	self.publisher = sub.impl.connections[0].callerid_pub
 
         # log for stamp_delay
         # TODO: maybe there's a better way than the exception

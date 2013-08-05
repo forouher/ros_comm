@@ -435,6 +435,7 @@ class TCPROSTransport(Transport):
 
         self.socket = None
         self.endpoint_id = 'unknown'
+        self.callerid_pub = 'unknown'
         self.dest_address = None # for reconnection
         
         if python3 == 0: # Python 2.x
@@ -556,6 +557,7 @@ class TCPROSTransport(Transport):
             if not required in header:
                 raise TransportInitError("header missing required field [%s]"%required)
         self.md5sum = header['md5sum']
+        self.callerid_pub = header['callerid']
         self.type = header['type']
         if header.get('latching', '0') == '1':
             self.is_latched = True

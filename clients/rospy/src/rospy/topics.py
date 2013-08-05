@@ -526,7 +526,7 @@ class Subscriber(Topic):
         if tcp_nodelay:
             self.impl.set_tcp_nodelay(tcp_nodelay)        
             
-        self.impl.add_callback(self.statistics_logger.get_callback(),self.statistics_logger.get_callback_args())
+        self.impl.add_callback(self.statistics_logger.get_callback(),self)
 
     def unregister(self):
         """
