@@ -619,6 +619,7 @@ class _SubscriberImpl(_TopicImpl):
         # save reference to avoid locking
         conn = self.connections
         #for now drop estimate is -1
+	# DFO: XXX interessant: c.stat_bytes, c.stat_num_msg?
         stats = (self.resolved_name, 
                  [(c.id, c.stat_bytes, c.stat_num_msg, -1, not c.done)
                   for c in conn] )
