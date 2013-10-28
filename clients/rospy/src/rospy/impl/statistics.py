@@ -114,8 +114,7 @@ class SubscriberStatisticsLogger():
 	self.hist_indx_ = 0
 
         # timestamp delay
-        self.delay_ = 0
-        self.delay_count_ = 0
+	self.delay_list_ = []
 
         self.last_seq_ = 0
         self.dropped_msgs_ = 0
@@ -148,19 +147,26 @@ class SubscriberStatisticsLogger():
         self.times_[self.hist_indx_] = curtime
         self.hist_indx_ = (self.hist_indx_ + 1) % self.window_size_
 
-	
 	msg = TopicStatistics()
 	msg.header.stamp = rospy.Time.now()
 	msg.topic = self.subscriber.name
 	msg.node_sub = rospy.get_name()
 	msg.node_pub = self.publisher
-        msg.stamp_delay_mean = self.delay_ / self.delay_count_
+	if len(self.delay_list_)>0:
+            msg.stamp_delay_mean = sum(self.delay_list_) / len(self.delay_list_)
+	    msg.stamp_delay_variance = sum((msg.stamp_delay_mean - value) ** 2 for value in self.delay_list_) / len(self.delay_list_)
+    	    msg.stamp_delay_max = max(self.delay_list_)
+	else:
+            msg.stamp_delay_mean = 0
+	    msg.stamp_delay_variance = 0
+	    msg.stamp_delay_max = 0
         msg.frequency_mean = freq
+        msg.frequency_variance = 0 # wie berechnen?
+        #msg.frequency_min = 0
         msg.dropped_msgs = self.dropped_msgs_
         self.pub.publish(msg)
 
-        self.delay_count_ = 0
-        self.delay_ = 0
+	self.delay_list_ = []
         self.dropped_msgs_ = 0
 
     def get_callback(self):
@@ -204,7 +210,7 @@ class SubscriberStatisticsLogger():
         # log for stamp_delay
         # TODO: maybe there's a better way than the exception
         try:
-            self.delay_ = self.delay_ + (rospy.Time.now() - msg.header.stamp).to_sec()
+	    self.delay_list_.append((rospy.Time.now() - msg.header.stamp).to_sec())
 
             if self.last_seq_ + 1 != msg.header.seq:
                 self.dropped_msgs_ = self.dropped_msgs_ + 1
@@ -212,9 +218,6 @@ class SubscriberStatisticsLogger():
 
         except:
             pass
-
-        self.delay_count_ = self.delay_count_ + 1
-
 
         if self.last_pub_time + self.pub_frequency < rospy.Time.now():
             self.sendStatistics()

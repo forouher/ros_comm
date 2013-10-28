@@ -7,3 +7,4 @@ float32 frequency_mean
 float32 frequency_variance
 float32 stamp_delay_mean
 float32 stamp_delay_variance
+float32 stamp_delay_max
