@@ -702,7 +702,9 @@ class _SubscriberImpl(_TopicImpl):
             for cb, cb_args in callbacks:
                 self._invoke_callback(msg, cb, cb_args)
 	    # /clock is special, as it is subscribed very early
-	    if not self.name == "/clock":
+	    # also exclude /statistics. this shouldn't be necessary longterm,
+	    # but it reduces noise.
+	    if not self.name == "/clock" and not self.name == "/statistics":
     		self.statistics_logger.callback(msg, connection.callerid_pub)
 
 class SubscribeListener(object):

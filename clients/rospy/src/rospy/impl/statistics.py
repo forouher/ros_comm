@@ -122,79 +122,72 @@ class ConnectionStatisticsLogger():
         Constructor: TODO
         
         - spawn a publisher thread
-        - add itself/the callback as a callback to the subscriber
         - handle thread lifecycles (especally destruction)
         """
 	self.topic = topic
         self.subscriber = subscriber
 	self.publisher = publisher
 	self.pub = rospy.Publisher("/statistics", TopicStatistics)
-	self.last_pub_time = rospy.Time.now()
+	self.last_pub_time = rospy.Time(0)
 	self.pub_frequency = rospy.Duration(1.0)
 	
-	self.window_size_ = 7
-
-        # frequency
-	self.count_ = 0
-	self.seq_nums_ = [self.count_ for x in range(self.window_size_)]
-	self.times_ = [self.last_pub_time for x in range(self.window_size_)]
-	self.hist_indx_ = 0
-
         # timestamp delay
 	self.delay_list_ = []
 
+	# period calculations
+	self.arrival_time_list_ = []
+
         self.last_seq_ = 0
         self.dropped_msgs_ = 0
+	self.window_start = rospy.Time.now()
 
         pass
 
     def sendStatistics(self):
 	"""
 	stuff to publish
-	- message frequency
-	- message variance
-	- message min/max frequency variations (within window)
-	- message drops/buffer overflow (counter)
-	- delta time (diff header.stamp - now())
 	- call hooks to do deep packet inspection? (later)
-	
-	create a new message type for this. while this is similar to
-	diagnostics, it is
-	a) too much string-based
-	b) REP 107 restricts it to drivers (should double check that)
-	c) might be hard to extend
 	"""
-	
 	curtime = rospy.Time.now()
-        curseq = self.count_
-        events = curseq - self.seq_nums_[self.hist_indx_]
-        window = (curtime - self.times_[self.hist_indx_]).to_sec()
-        freq = events / window
-        self.seq_nums_[self.hist_indx_] = curseq
-        self.times_[self.hist_indx_] = curtime
-        self.hist_indx_ = (self.hist_indx_ + 1) % self.window_size_
+
+	window_start = self.window_start
+	self.window_start = curtime
 
 	msg = TopicStatistics()
-	msg.header.stamp = rospy.Time.now()
 	msg.topic = self.topic
 	msg.node_sub = self.subscriber
 	msg.node_pub = self.publisher
+
+
+	msg.window_start = window_start
+	msg.window_stop  = curtime
+
+        msg.dropped_msgs = self.dropped_msgs_
+
 	if len(self.delay_list_)>0:
             msg.stamp_delay_mean = sum(self.delay_list_) / len(self.delay_list_)
 	    msg.stamp_delay_variance = sum((msg.stamp_delay_mean - value) ** 2 for value in self.delay_list_) / len(self.delay_list_)
     	    msg.stamp_delay_max = max(self.delay_list_)
 	else:
-            msg.stamp_delay_mean = 0
-	    msg.stamp_delay_variance = 0
-	    msg.stamp_delay_max = 0
-        msg.frequency_mean = freq
-        msg.frequency_variance = 0 # wie berechnen?
-        #msg.frequency_min = 0
-        msg.dropped_msgs = self.dropped_msgs_
-        self.pub.publish(msg)
+            msg.stamp_delay_mean = float('NaN')
+	    msg.stamp_delay_variance = float('NaN')
+	    msg.stamp_delay_max = float('NaN')
+
+	if len(self.arrival_time_list_)>1:
+	    periods = [j-i for i, j in zip(self.arrival_time_list_[:-1], self.arrival_time_list_[1:])]
+            msg.period_mean = sum(periods)/len(periods)
+	    msg.period_variance = sum((msg.period_mean - value) ** 2 for value in periods) / len(periods)
+            msg.period_max = max(periods)
+	else:
+            msg.period_mean = float('NaN')
+	    msg.period_variance = float('NaN')
+            msg.period_max = float('NaN')
 
 	self.delay_list_ = []
+	self.arrival_time_list_ = []
         self.dropped_msgs_ = 0
+
+        self.pub.publish(msg)
 
     def callback(self,msg):
         """
@@ -214,17 +207,12 @@ class ConnectionStatisticsLogger():
         any computing-heavy stuff should likely be done somewhere else,
         as this callback will probably block the other callbacks?
         
-        XXX: idea: can I call this callback *last*? this would allow me to
-        also measure the callback runtime of the subscriber (unless it does
-        its computation async)
-        
         this callback will keep some statistics and publish the results
         periodically on a topic. the publishing should probably be done
         asynchronically in another thread.
         """
 
-        # log for frequency
-        self.count_ = self.count_ + 1
+	self.arrival_time_list_.append(rospy.Time.now().to_sec())
 
         # log for stamp_delay
         # TODO: maybe there's a better way than the exception
@@ -239,7 +227,7 @@ class ConnectionStatisticsLogger():
             pass
 
         if self.last_pub_time + self.pub_frequency < rospy.Time.now():
-            self.sendStatistics()
             self.last_pub_time = rospy.Time.now()
-        pass
+            self.sendStatistics()
+
 
