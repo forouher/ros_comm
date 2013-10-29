@@ -524,11 +524,6 @@ class Subscriber(Topic):
         if tcp_nodelay:
             self.impl.set_tcp_nodelay(tcp_nodelay)        
 
-        # TODO: add here another callback, that does our statistics stuff
-	if not self.name == "/clock":
-    	    self.statistics_logger = SubscriberStatisticsLogger(self);
-    	    self.impl.add_callback(self.statistics_logger.get_callback(),self)
-
     def unregister(self):
         """
         unpublish/unsubscribe from topic. Topic instance is no longer
@@ -562,6 +557,7 @@ class _SubscriberImpl(_TopicImpl):
         self.queue_size = None
         self.buff_size = DEFAULT_BUFF_SIZE
         self.tcp_nodelay = False
+        self.statistics_logger = SubscriberStatisticsLogger(self);
 
     def close(self):
         """close I/O and release resources"""
@@ -705,6 +701,9 @@ class _SubscriberImpl(_TopicImpl):
         for msg in msgs:
             for cb, cb_args in callbacks:
                 self._invoke_callback(msg, cb, cb_args)
+	    # /clock is special, as it is subscribed very early
+	    if not self.name == "/clock":
+    		self.statistics_logger.callback(msg, connection.callerid_pub)
 
 class SubscribeListener(object):
     """

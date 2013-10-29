@@ -78,7 +78,32 @@ Message = genpy.Message
 
 class SubscriberStatisticsLogger():
     """
-    Class that monitors lots of stuff on each subscriber.
+    Class that monitors each subscriber.
+
+    this class basically just keeps a collection of ConnectionStatisticsLogger.
+    """
+
+    def __init__(self, subscriber):
+        self.subscriber = subscriber
+	self.connections = dict()
+        pass
+
+    def callback(self,msg,publisher):
+
+	# create ConnectionStatisticsLogger for new connections
+	logger = self.connections.get(publisher)
+	if logger == None:
+	    logger = ConnectionStatisticsLogger(self.subscriber.name, rospy.get_name(), publisher)
+	    self.connections[publisher] = logger
+
+	# delegate stuff to that instance
+	logger.callback(msg)
+
+        pass
+
+class ConnectionStatisticsLogger():
+    """
+    Class that monitors lots of stuff for each connection
     
     is created whenever a subscriber is created.
     is destroyed whenever its parent subscriber is destroyed.
@@ -92,7 +117,7 @@ class SubscriberStatisticsLogger():
 
     """
 
-    def __init__(self, subscriber):
+    def __init__(self, topic, subscriber, publisher):
         """
         Constructor: TODO
         
@@ -100,7 +125,9 @@ class SubscriberStatisticsLogger():
         - add itself/the callback as a callback to the subscriber
         - handle thread lifecycles (especally destruction)
         """
+	self.topic = topic
         self.subscriber = subscriber
+	self.publisher = publisher
 	self.pub = rospy.Publisher("/statistics", TopicStatistics)
 	self.last_pub_time = rospy.Time.now()
 	self.pub_frequency = rospy.Duration(1.0)
@@ -149,8 +176,8 @@ class SubscriberStatisticsLogger():
 
 	msg = TopicStatistics()
 	msg.header.stamp = rospy.Time.now()
-	msg.topic = self.subscriber.name
-	msg.node_sub = rospy.get_name()
+	msg.topic = self.topic
+	msg.node_sub = self.subscriber
 	msg.node_pub = self.publisher
 	if len(self.delay_list_)>0:
             msg.stamp_delay_mean = sum(self.delay_list_) / len(self.delay_list_)
@@ -169,13 +196,7 @@ class SubscriberStatisticsLogger():
 	self.delay_list_ = []
         self.dropped_msgs_ = 0
 
-    def get_callback(self):
-	return self.callback
-
-    def get_callback_args(self):
-	return "" # TODO ???
-
-    def callback(self,msg,sub):
+    def callback(self,msg):
         """
         Callback: TODO
         
@@ -205,13 +226,12 @@ class SubscriberStatisticsLogger():
         # log for frequency
         self.count_ = self.count_ + 1
 
-	self.publisher = sub.impl.connections[0].callerid_pub
-
         # log for stamp_delay
         # TODO: maybe there's a better way than the exception
         try:
 	    self.delay_list_.append((rospy.Time.now() - msg.header.stamp).to_sec())
 
+	    # TODO: this doesnt handle multiple publisher, bug #300
             if self.last_seq_ + 1 != msg.header.seq:
                 self.dropped_msgs_ = self.dropped_msgs_ + 1
             self.last_seq_ = msg.header.seq
