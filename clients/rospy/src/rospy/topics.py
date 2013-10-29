@@ -509,8 +509,6 @@ class Subscriber(Topic):
         if buff_size != DEFAULT_BUFF_SIZE:
             self.impl.set_buff_size(buff_size)
             
-        # TODO: add here another callback, that does our statistics stuff
-        self.statistics_logger = SubscriberStatisticsLogger(self);
 
         if callback is not None:
             # #1852
@@ -525,8 +523,11 @@ class Subscriber(Topic):
             self.callback = self.callback_args = None            
         if tcp_nodelay:
             self.impl.set_tcp_nodelay(tcp_nodelay)        
-            
-        self.impl.add_callback(self.statistics_logger.get_callback(),self)
+
+        # TODO: add here another callback, that does our statistics stuff
+	if not self.name == "/clock":
+    	    self.statistics_logger = SubscriberStatisticsLogger(self);
+    	    self.impl.add_callback(self.statistics_logger.get_callback(),self)
 
     def unregister(self):
         """
