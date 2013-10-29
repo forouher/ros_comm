@@ -589,6 +589,7 @@ class TCPROSTransport(Transport):
         if sock is None:
             return
         sock.setblocking(1)
+	# TODO: add bytes received to self.stat_bytes
         self._validate_header(read_ros_handshake_header(sock, self.read_buff, self.protocol.buff_size))
                 
     def send_message(self, msg, seq):
@@ -668,7 +669,7 @@ class TCPROSTransport(Transport):
                 if b.tell() >= 4:
                     p.read_messages(b, msg_queue, sock) 
                 if not msg_queue:
-                    recv_buff(sock, b, p.buff_size)
+                    self.stat_bytes += recv_buff(sock, b, p.buff_size)
             self.stat_num_msg += len(msg_queue) #STATS
             # set the _connection_header field
             for m in msg_queue:

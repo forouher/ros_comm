@@ -88,7 +88,7 @@ class SubscriberStatisticsLogger():
 	self.connections = dict()
         pass
 
-    def callback(self,msg,publisher):
+    def callback(self,msg,publisher, stat_bytes):
 
 	# create ConnectionStatisticsLogger for new connections
 	logger = self.connections.get(publisher)
@@ -97,7 +97,7 @@ class SubscriberStatisticsLogger():
 	    self.connections[publisher] = logger
 
 	# delegate stuff to that instance
-	logger.callback(msg)
+	logger.callback(msg, stat_bytes)
 
         pass
 
@@ -131,6 +131,9 @@ class ConnectionStatisticsLogger():
 	self.last_pub_time = rospy.Time(0)
 	self.pub_frequency = rospy.Duration(1.0)
 	
+	self.stat_bytes_last_ = 0
+	self.stat_bytes_window_ = 0
+
         # timestamp delay
 	self.delay_list_ = []
 
@@ -158,6 +161,7 @@ class ConnectionStatisticsLogger():
 	msg.node_sub = self.subscriber
 	msg.node_pub = self.publisher
 
+	msg.traffic = self.stat_bytes_window_ / self.pub_frequency.to_sec()
 
 	msg.window_start = window_start
 	msg.window_stop  = curtime
@@ -189,7 +193,7 @@ class ConnectionStatisticsLogger():
 
         self.pub.publish(msg)
 
-    def callback(self,msg):
+    def callback(self,msg, stat_bytes):
         """
         Callback: TODO
         
@@ -214,6 +218,9 @@ class ConnectionStatisticsLogger():
 
 	self.arrival_time_list_.append(rospy.Time.now().to_sec())
 
+	self.stat_bytes_window_ = stat_bytes - self.stat_bytes_last_
+	self.stat_bytes_last_ = stat_bytes
+
         # log for stamp_delay
         # TODO: maybe there's a better way than the exception
         try:
@@ -223,8 +230,9 @@ class ConnectionStatisticsLogger():
                 self.dropped_msgs_ = self.dropped_msgs_ + 1
             self.last_seq_ = msg.header.seq
 
-        except:
-            pass
+	except Exception, e:
+	    print "Couldn't do it: %s" % e
+	    pass
 
         if self.last_pub_time + self.pub_frequency < rospy.Time.now():
             self.last_pub_time = rospy.Time.now()

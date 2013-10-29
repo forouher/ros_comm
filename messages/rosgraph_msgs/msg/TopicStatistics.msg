@@ -14,6 +14,9 @@ time window_stop
 # numbers of messages dropped during the window
 int32 dropped_msgs
 
+# current traffic on this connection, in Bytes/s
+float32 traffic
+
 # mean/variance/max period between two messages
 float32 period_mean
 float32 period_variance

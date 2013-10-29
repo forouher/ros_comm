@@ -705,7 +705,7 @@ class _SubscriberImpl(_TopicImpl):
 	    # also exclude /statistics. this shouldn't be necessary longterm,
 	    # but it reduces noise.
 	    if not self.name == "/clock" and not self.name == "/statistics":
-    		self.statistics_logger.callback(msg, connection.callerid_pub)
+    		self.statistics_logger.callback(msg, connection.callerid_pub, connection.stat_bytes)
 
 class SubscribeListener(object):
     """
