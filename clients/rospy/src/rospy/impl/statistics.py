@@ -221,18 +221,12 @@ class ConnectionStatisticsLogger():
 	self.stat_bytes_window_ = stat_bytes - self.stat_bytes_last_
 	self.stat_bytes_last_ = stat_bytes
 
-        # log for stamp_delay
-        # TODO: maybe there's a better way than the exception
-        try:
+	if msg._has_header:
 	    self.delay_list_.append((rospy.Time.now() - msg.header.stamp).to_sec())
 
-            if self.last_seq_ + 1 != msg.header.seq:
+    	    if self.last_seq_ + 1 != msg.header.seq:
                 self.dropped_msgs_ = self.dropped_msgs_ + 1
-            self.last_seq_ = msg.header.seq
-
-	except Exception, e:
-	    print "Couldn't do it: %s" % e
-	    pass
+    	    self.last_seq_ = msg.header.seq
 
         if self.last_pub_time + self.pub_frequency < rospy.Time.now():
             self.last_pub_time = rospy.Time.now()
