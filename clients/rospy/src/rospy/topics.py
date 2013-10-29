@@ -694,7 +694,7 @@ class _SubscriberImpl(_TopicImpl):
             else:
                 _logger.warn("during shutdown, bad callback: %s\n%s"%(cb, traceback.format_exc()))
         
-    def receive_callback(self, msgs):
+    def receive_callback(self, msgs, connection):
         """
         Called by underlying connection transport for each new message received
         @param msgs: message data
