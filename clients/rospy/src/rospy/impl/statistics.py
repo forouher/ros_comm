@@ -99,8 +99,6 @@ class SubscriberStatisticsLogger():
 	# delegate stuff to that instance
 	logger.callback(msg, stat_bytes)
 
-        pass
-
 class ConnectionStatisticsLogger():
     """
     Class that monitors lots of stuff for each connection
@@ -195,19 +193,6 @@ class ConnectionStatisticsLogger():
 
     def callback(self,msg, stat_bytes):
         """
-        Callback: TODO
-        
-        needs to know:
-        - packet content (data) DONE
-        - all secret meta data there might be (time of arrival?)
-        - topic message type (at least, if there is a header)
-        - subscriber topic name
-        - nodes of subscriber/publisher
-        - traffic volume?
-        - publisher topic name (on publisher side, ignoring remapping stuff)
-          - these two are likely needed to create the graph.
-          - buffer size (to measure message drops or similar)
-        
         any computing-heavy stuff should likely be done somewhere else,
         as this callback will probably block the other callbacks?
         
