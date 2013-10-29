@@ -231,7 +231,6 @@ class ConnectionStatisticsLogger():
         try:
 	    self.delay_list_.append((rospy.Time.now() - msg.header.stamp).to_sec())
 
-	    # TODO: this doesnt handle multiple publisher, bug #300
             if self.last_seq_ + 1 != msg.header.seq:
                 self.dropped_msgs_ = self.dropped_msgs_ + 1
             self.last_seq_ = msg.header.seq
