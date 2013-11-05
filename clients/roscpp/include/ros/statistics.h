@@ -44,11 +44,17 @@ public:
   StatisticsLogger();
   ~StatisticsLogger();
 
-  void callback(const SerializedMessage& m);
+  void callback(const std::string topic, const std::string callerid, const SerializedMessage& m, uint64_t bytes_sent);
 
 private:
   ros::Publisher pub_;
   ros::Time last_publish_;
+  std::list<ros::Time> arrival_time_list_;
+  std::list<double> delay_list_;
+  double pub_frequency_;
+  uint64_t dropped_msgs_;
+  uint64_t last_seq_;
+  uint64_t stat_bytes_last_;
 
 };
 

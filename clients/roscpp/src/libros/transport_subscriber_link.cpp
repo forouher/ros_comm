@@ -172,9 +172,10 @@ void TransportSubscriberLink::startMessageWrite(bool immediate_write)
 
 void TransportSubscriberLink::enqueueMessage(const SerializedMessage& m, bool ser, bool nocopy)
 {
-  // Dariush: This could be a good entry-point
-    if (getTopic().compare("/statistics")) {
-      statistics_.callback(m);
+    // TODO: what about locks?
+    // don't do statistics on /statistics and /rosout (for now)
+    if (getTopic().compare("/statistics") && getTopic().compare("/rosout")) {
+      statistics_.callback(topic_,destination_caller_id_,m,stats_.bytes_sent_);
     }
 
   if (!ser)
