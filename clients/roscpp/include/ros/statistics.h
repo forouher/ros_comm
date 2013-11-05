@@ -44,7 +44,7 @@ public:
   StatisticsLogger();
   ~StatisticsLogger();
 
-  void callback(const std::string topic, const std::string callerid, const SerializedMessage& m, uint64_t bytes_sent);
+  void callback(const std::string topic, const std::string callerid, const SerializedMessage& m, const uint64_t bytes_sent, const ros::Time& received_time, const bool dropped);
 
 private:
   ros::Publisher pub_;

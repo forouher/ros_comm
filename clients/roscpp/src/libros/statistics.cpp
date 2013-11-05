@@ -46,18 +46,20 @@ StatisticsLogger::~StatisticsLogger()
 {
 }
 
-void StatisticsLogger::callback(const std::string topic, const std::string callerid, const SerializedMessage& m, uint64_t bytes_sent)
+void StatisticsLogger::callback(const std::string topic, const std::string callerid, const SerializedMessage& m, const uint64_t bytes_sent,
+				const ros::Time& received_time, const bool dropped)
 {
-  ros::Time now = ros::Time::now();
+  arrival_time_list_.push_back(received_time);
 
-  arrival_time_list_.push_back(now);
+  if (dropped)
+    dropped_msgs_++;
 
   bool has_header = false;
   if (has_header) {
-    ros::Time header_stamp = now;
+    ros::Time header_stamp = received_time;
     uint64_t seq_no = 0;
 
-    delay_list_.push_back((now-header_stamp).toSec());
+    delay_list_.push_back((received_time-header_stamp).toSec());
 
     if (++last_seq_ != seq_no) {
       last_seq_ = seq_no;
@@ -66,16 +68,16 @@ void StatisticsLogger::callback(const std::string topic, const std::string calle
     }
   }
 
-  if (last_publish_ + ros::Duration(pub_frequency_) < now) {
+  if (last_publish_ + ros::Duration(pub_frequency_) < received_time) {
     ros::Time window_start = last_publish_;
-    last_publish_ = now;
+    last_publish_ = received_time;
 
     rosgraph_msgs::TopicStatistics msg;
     msg.topic = topic;
     msg.node_pub = callerid;
     msg.node_sub = ros::this_node::getName();
     msg.window_start = window_start;
-    msg.window_stop = now;
+    msg.window_stop = received_time;
     msg.dropped_msgs = dropped_msgs_;
     msg.traffic = (bytes_sent - stat_bytes_last_) / pub_frequency_;
 
