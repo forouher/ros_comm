@@ -172,11 +172,6 @@ void TransportSubscriberLink::startMessageWrite(bool immediate_write)
 
 void TransportSubscriberLink::enqueueMessage(const SerializedMessage& m, bool ser, bool nocopy)
 {
-    // TODO: what about locks?
-    // don't do statistics on /statistics and /rosout (for now)
-    if (getTopic().compare("/statistics") && getTopic().compare("/rosout")) {
-      statistics_.callback(topic_,destination_caller_id_,m,stats_.bytes_sent_);
-    }
 
   if (!ser)
   {
@@ -219,6 +214,7 @@ void TransportSubscriberLink::enqueueMessage(const SerializedMessage& m, bool se
   stats_.messages_sent_++;
   stats_.bytes_sent_ += m.num_bytes;
   stats_.message_data_sent_ += m.num_bytes;
+
 }
 
 std::string TransportSubscriberLink::getTransportType()

@@ -35,8 +35,6 @@ namespace ros
 
 StatisticsLogger::StatisticsLogger()
 {
-  ros::NodeHandle n("~");
-  pub_ = n.advertise<rosgraph_msgs::TopicStatistics>("/statistics",1);
   last_publish_ = ros::Time::now();
   stat_bytes_last_ = 0;
   dropped_msgs_ = 0;
@@ -56,8 +54,8 @@ void StatisticsLogger::callback(const std::string topic, const std::string calle
 
   bool has_header = false;
   if (has_header) {
-    ros::Time header_stamp;
-    uint64_t seq_no;
+    ros::Time header_stamp = now;
+    uint64_t seq_no = 0;
 
     delay_list_.push_back((now-header_stamp).toSec());
 
@@ -139,7 +137,12 @@ void StatisticsLogger::callback(const std::string topic, const std::string calle
         msg.period_variance = nan("char-sequence");
         msg.period_max = nan("char-sequence");
     }
-
+ 
+      if (!pub_.getTopic().length()) {
+        ros::NodeHandle n("~");
+	// creating the publisher in the constructor results in a deadlock. so do it here.
+        pub_ = n.advertise<rosgraph_msgs::TopicStatistics>("/statistics",1);
+      }
     pub_.publish(msg);
 
     delay_list_.clear();

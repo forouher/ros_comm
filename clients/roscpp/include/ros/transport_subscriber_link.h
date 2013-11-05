@@ -29,7 +29,6 @@
 #define ROSCPP_TRANSPORT_SUBSCRIBER_LINK_H
 #include "common.h"
 #include "subscriber_link.h"
-#include "statistics.h"
 
 #include <boost/signals/connection.hpp>
 
@@ -64,8 +63,6 @@ private:
 
   bool writing_message_;
   bool header_written_;
-
-  StatisticsLogger statistics_;
 
   ConnectionPtr connection_;
   boost::signals::connection dropped_conn_;

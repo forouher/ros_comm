@@ -657,6 +657,11 @@ uint32_t Subscription::handleMessage(const SerializedMessage& m, bool ser, bool 
     }
   }
 
+  // TODO: what about locks?
+  // TODO: handle queue overflow?
+  statistics_.callback(name_,"callerid",m,0);
+
+
   // If this link is latched, store off the message so we can immediately pass it to new subscribers later
   if (link->isLatched())
   {
