@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, Morgan Quigley and Willow Garage, Inc.
+ * Copyright (C) 2013, Dariush Forouher
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -25,57 +25,50 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_TRANSPORT_SUBSCRIBER_LINK_H
-#define ROSCPP_TRANSPORT_SUBSCRIBER_LINK_H
-#include "common.h"
-#include "subscriber_link.h"
-#include "statistics.h"
-
-#include <boost/signals/connection.hpp>
+#include "ros/statistics.h"
+#include "ros/node_handle.h"
+#include <rosgraph_msgs/TopicStatistics.h>
+#include "ros/this_node.h"
 
 namespace ros
 {
 
-/**
- * \brief SubscriberLink handles broadcasting messages to a single subscriber on a single topic
- */
-class ROSCPP_DECL TransportSubscriberLink : public SubscriberLink
+StatisticsLogger::StatisticsLogger()
 {
-public:
-  TransportSubscriberLink();
-  virtual ~TransportSubscriberLink();
+  ros::NodeHandle n("~");
+  pub_ = n.advertise<rosgraph_msgs::TopicStatistics>("/statistics",1);
+  last_publish_ = ros::Time::now();
+}
 
-  //
-  bool initialize(const ConnectionPtr& connection);
-  bool handleHeader(const Header& header);
+StatisticsLogger::~StatisticsLogger()
+{
+}
 
-  const ConnectionPtr& getConnection() { return connection_; }
+void StatisticsLogger::callback(const SerializedMessage& m)
+{
+  ros::Time now = ros::Time::now();
 
-  virtual void enqueueMessage(const SerializedMessage& m, bool ser, bool nocopy);
-  virtual void drop();
-  virtual std::string getTransportType();
+  if (last_publish_ + ros::Duration(1.0) < now) {
+    ros::Time window_start = last_publish_;
+    last_publish_ = now;
 
-private:
-  void onConnectionDropped(const ConnectionPtr& conn);
+    rosgraph_msgs::TopicStatistics msg;
+    msg.topic = "/foo";
+    msg.node_pub = "unkonwn";
+    msg.node_sub = ros::this_node::getName();
+    msg.window_start = window_start;
+    msg.window_stop = now;
+    msg.dropped_msgs = 0;
+    msg.traffic = 0;
+    msg.period_mean = 0;
+    msg.period_variance = 0;
+    msg.period_max = 0;
+    msg.stamp_delay_mean = 0;
+    msg.stamp_delay_variance = 0;
+    msg.stamp_delay_max = 0;
+    pub_.publish(msg);
+  }
+}
 
-  void onHeaderWritten(const ConnectionPtr& conn);
-  void onMessageWritten(const ConnectionPtr& conn);
-  void startMessageWrite(bool immediate_write);
-
-  bool writing_message_;
-  bool header_written_;
-
-  StatisticsLogger statistics_;
-
-  ConnectionPtr connection_;
-  boost::signals::connection dropped_conn_;
-
-  std::queue<SerializedMessage> outbox_;
-  boost::mutex outbox_mutex_;
-  bool queue_full_;
-};
-typedef boost::shared_ptr<TransportSubscriberLink> TransportSubscriberLinkPtr;
 
 } // namespace ros
-
-#endif // ROSCPP_TRANSPORT_SUBSCRIBER_LINK_H

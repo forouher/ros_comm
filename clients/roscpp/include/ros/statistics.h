@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, Morgan Quigley and Willow Garage, Inc.
+ * Copyright (C) 2013, Dariush Forouher
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -8,7 +8,7 @@
  *   * Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- *   * Neither the names of Stanford University or Willow Garage, Inc. nor the names of its
+ *   * Neither the names of Willow Garage, Inc. nor the names of its
  *     contributors may be used to endorse or promote products derived from
  *     this software without specific prior written permission.
  *
@@ -25,57 +25,33 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_TRANSPORT_SUBSCRIBER_LINK_H
-#define ROSCPP_TRANSPORT_SUBSCRIBER_LINK_H
-#include "common.h"
-#include "subscriber_link.h"
-#include "statistics.h"
+#ifndef STATISTICS_H
+#define STATISTICS_H
 
-#include <boost/signals/connection.hpp>
+#include "forwards.h"
+#include "poll_set.h"
+#include "common.h"
+#include "publisher.h"
+#include <ros/time.h>
 
 namespace ros
 {
 
-/**
- * \brief SubscriberLink handles broadcasting messages to a single subscriber on a single topic
- */
-class ROSCPP_DECL TransportSubscriberLink : public SubscriberLink
+class ROSCPP_DECL StatisticsLogger
 {
 public:
-  TransportSubscriberLink();
-  virtual ~TransportSubscriberLink();
 
-  //
-  bool initialize(const ConnectionPtr& connection);
-  bool handleHeader(const Header& header);
+  StatisticsLogger();
+  ~StatisticsLogger();
 
-  const ConnectionPtr& getConnection() { return connection_; }
-
-  virtual void enqueueMessage(const SerializedMessage& m, bool ser, bool nocopy);
-  virtual void drop();
-  virtual std::string getTransportType();
+  void callback(const SerializedMessage& m);
 
 private:
-  void onConnectionDropped(const ConnectionPtr& conn);
+  ros::Publisher pub_;
+  ros::Time last_publish_;
 
-  void onHeaderWritten(const ConnectionPtr& conn);
-  void onMessageWritten(const ConnectionPtr& conn);
-  void startMessageWrite(bool immediate_write);
-
-  bool writing_message_;
-  bool header_written_;
-
-  StatisticsLogger statistics_;
-
-  ConnectionPtr connection_;
-  boost::signals::connection dropped_conn_;
-
-  std::queue<SerializedMessage> outbox_;
-  boost::mutex outbox_mutex_;
-  bool queue_full_;
 };
-typedef boost::shared_ptr<TransportSubscriberLink> TransportSubscriberLinkPtr;
 
-} // namespace ros
+}
 
-#endif // ROSCPP_TRANSPORT_SUBSCRIBER_LINK_H
+#endif

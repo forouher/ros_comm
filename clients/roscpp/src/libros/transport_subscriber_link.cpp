@@ -172,6 +172,11 @@ void TransportSubscriberLink::startMessageWrite(bool immediate_write)
 
 void TransportSubscriberLink::enqueueMessage(const SerializedMessage& m, bool ser, bool nocopy)
 {
+  // Dariush: This could be a good entry-point
+    if (getTopic().compare("/statistics")) {
+      statistics_.callback(m);
+    }
+
   if (!ser)
   {
     return;
