@@ -206,6 +206,9 @@ class ConnectionStatisticsLogger():
 	self.stat_bytes_window_ = stat_bytes - self.stat_bytes_last_
 	self.stat_bytes_last_ = stat_bytes
 
+	# rospy has the feature to subscribe a topic with AnyMsg, which isn't serialized
+	# those subscribers won't have a header. but as these subscribers are rather rare
+	# and useless (hopefully ;), I'm gonna ignore them
 	if msg._has_header:
 	    self.delay_list_.append((rospy.Time.now() - msg.header.stamp).to_sec())
 
