@@ -33,6 +33,7 @@
 #include "common.h"
 #include "publisher.h"
 #include <ros/time.h>
+#include "ros/subscription_callback_helper.h"
 
 namespace ros
 {
@@ -44,9 +45,12 @@ public:
   StatisticsLogger();
   ~StatisticsLogger();
 
-  void callback(const std::string topic, const std::string callerid, const SerializedMessage& m, const uint64_t bytes_sent, const ros::Time& received_time, const bool dropped);
+  void init(const SubscriptionCallbackHelperPtr& helper);
+
+  void callback(const boost::shared_ptr<M_string>& connection_header, const std::string topic, const std::string callerid, const SerializedMessage& m, const uint64_t bytes_sent, const ros::Time& received_time, const bool dropped);
 
 private:
+  bool hasHeader_;
   ros::Publisher pub_;
   ros::Time last_publish_;
   std::list<ros::Time> arrival_time_list_;

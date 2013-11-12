@@ -29,6 +29,8 @@
 #include "ros/node_handle.h"
 #include <rosgraph_msgs/TopicStatistics.h>
 #include "ros/this_node.h"
+#include "ros/message_traits.h"
+#include "std_msgs/Header.h"
 
 namespace ros
 {
@@ -46,7 +48,12 @@ StatisticsLogger::~StatisticsLogger()
 {
 }
 
-void StatisticsLogger::callback(const std::string topic, const std::string callerid, const SerializedMessage& m, const uint64_t bytes_sent,
+void StatisticsLogger::init(const SubscriptionCallbackHelperPtr& helper) {
+  hasHeader_ = helper->hasHeader();
+}
+
+void StatisticsLogger::callback(const boost::shared_ptr<M_string>& connection_header,
+				const std::string topic, const std::string callerid, const SerializedMessage& m, const uint64_t bytes_sent,
 				const ros::Time& received_time, const bool dropped)
 {
   arrival_time_list_.push_back(received_time);
@@ -54,18 +61,13 @@ void StatisticsLogger::callback(const std::string topic, const std::string calle
   if (dropped)
     dropped_msgs_++;
 
-  bool has_header = false;
-  if (has_header) {
-    ros::Time header_stamp = received_time;
-    uint64_t seq_no = 0;
-
-    delay_list_.push_back((received_time-header_stamp).toSec());
-
-    if (++last_seq_ != seq_no) {
-      last_seq_ = seq_no;
-      dropped_msgs_++; // TODO: may have dropped more than one
-      // TODO: maybe messages are dropped AFTER this statistics are done...?
-    }
+  if (hasHeader_) {
+    // TODO: maybe wrap this with an exception handler,
+    // in case serialization fails?
+    std_msgs::Header header;
+    ros::serialization::IStream stream(m.buf.get(), m.num_bytes);
+    ros::serialization::deserialize(stream, header);
+    delay_list_.push_back((received_time-header.stamp).toSec());
   }
 
   if (last_publish_ + ros::Duration(pub_frequency_) < received_time) {
