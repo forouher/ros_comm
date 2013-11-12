@@ -34,6 +34,7 @@
 #include "publisher.h"
 #include <ros/time.h>
 #include "ros/subscription_callback_helper.h"
+#include <map>
 
 namespace ros
 {
@@ -50,16 +51,19 @@ public:
   void callback(const boost::shared_ptr<M_string>& connection_header, const std::string topic, const std::string callerid, const SerializedMessage& m, const uint64_t bytes_sent, const ros::Time& received_time, const bool dropped);
 
 private:
-  bool hasHeader_;
-  ros::Publisher pub_;
-  ros::Time last_publish_;
-  std::list<ros::Time> arrival_time_list_;
-  std::list<double> delay_list_;
-  double pub_frequency_;
-  uint64_t dropped_msgs_;
-  uint64_t last_seq_;
-  uint64_t stat_bytes_last_;
 
+  bool hasHeader_;
+  double pub_frequency_;
+  ros::Publisher pub_;
+  struct StatData {
+    ros::Time last_publish;
+    std::list<ros::Time> arrival_time_list;
+    std::list<double> delay_list;
+    uint64_t dropped_msgs;
+    uint64_t last_seq;
+    uint64_t stat_bytes_last;
+  };
+  std::map<std::string, struct StatData> map_;
 };
 
 }

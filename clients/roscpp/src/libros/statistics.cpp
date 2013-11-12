@@ -37,10 +37,6 @@ namespace ros
 
 StatisticsLogger::StatisticsLogger()
 {
-  last_publish_ = ros::Time::now();
-  stat_bytes_last_ = 0;
-  dropped_msgs_ = 0;
-
   pub_frequency_ = 1.0;
 }
 
@@ -56,10 +52,22 @@ void StatisticsLogger::callback(const boost::shared_ptr<M_string>& connection_he
 				const std::string topic, const std::string callerid, const SerializedMessage& m, const uint64_t bytes_sent,
 				const ros::Time& received_time, const bool dropped)
 {
-  arrival_time_list_.push_back(received_time);
+  struct StatData stats;
+
+  std::map<std::string,struct StatData>::iterator stats_it = map_.find(callerid);
+  if (stats_it == map_.end()) {
+    stats.stat_bytes_last = 0;
+    stats.dropped_msgs = 0;
+    stats.last_publish = ros::Time::now();
+    map_[callerid] = stats;
+  } else {
+    stats = map_[callerid];
+  }
+
+  stats.arrival_time_list.push_back(received_time);
 
   if (dropped)
-    dropped_msgs_++;
+    stats.dropped_msgs++;
 
   if (hasHeader_) {
     // TODO: maybe wrap this with an exception handler,
@@ -67,12 +75,12 @@ void StatisticsLogger::callback(const boost::shared_ptr<M_string>& connection_he
     std_msgs::Header header;
     ros::serialization::IStream stream(m.buf.get(), m.num_bytes);
     ros::serialization::deserialize(stream, header);
-    delay_list_.push_back((received_time-header.stamp).toSec());
+    stats.delay_list.push_back((received_time-header.stamp).toSec());
   }
 
-  if (last_publish_ + ros::Duration(pub_frequency_) < received_time) {
-    ros::Time window_start = last_publish_;
-    last_publish_ = received_time;
+  if (stats.last_publish + ros::Duration(pub_frequency_) < received_time) {
+    ros::Time window_start = stats.last_publish;
+    stats.last_publish = received_time;
 
     rosgraph_msgs::TopicStatistics msg;
     msg.topic = topic;
@@ -80,38 +88,38 @@ void StatisticsLogger::callback(const boost::shared_ptr<M_string>& connection_he
     msg.node_sub = ros::this_node::getName();
     msg.window_start = window_start;
     msg.window_stop = received_time;
-    msg.dropped_msgs = dropped_msgs_;
-    msg.traffic = (bytes_sent - stat_bytes_last_) / pub_frequency_;
+    msg.dropped_msgs = stats.dropped_msgs;
+    msg.traffic = (bytes_sent - stats.stat_bytes_last) / pub_frequency_;
 
-    if (delay_list_.size()>0) {
+    if (stats.delay_list.size()>0) {
       msg.stamp_delay_mean = 0;
       msg.stamp_delay_max = 0;
-      for(std::list<double>::iterator it = delay_list_.begin(); it != delay_list_.end(); it++) {
+      for(std::list<double>::iterator it = stats.delay_list.begin(); it != stats.delay_list.end(); it++) {
 	double delay = *it;
 	msg.stamp_delay_mean += delay;
 	if (delay > msg.stamp_delay_max)
 	    msg.stamp_delay_max = delay;
       }
-      msg.stamp_delay_mean /= delay_list_.size();
+      msg.stamp_delay_mean /= stats.delay_list.size();
 
       msg.stamp_delay_variance = 0;
-      for(std::list<double>::iterator it = delay_list_.begin(); it != delay_list_.end(); it++) {
+      for(std::list<double>::iterator it = stats.delay_list.begin(); it != stats.delay_list.end(); it++) {
 	double t = msg.stamp_delay_mean - *it;
 	msg.stamp_delay_variance += t*t;
       }
-      msg.stamp_delay_variance /= delay_list_.size();
+      msg.stamp_delay_variance /= stats.delay_list.size();
 
     } else {
         msg.stamp_delay_mean = nan("char-sequence");
         msg.stamp_delay_variance = nan("char-sequence");
         msg.stamp_delay_max = nan("char-sequence");
     }
-    if (arrival_time_list_.size()>1) {
+    if (stats.arrival_time_list.size()>1) {
       ros::Time prev;
       msg.period_mean = 0;
       msg.period_max = 0;
-      for(std::list<ros::Time>::iterator it = arrival_time_list_.begin(); it != arrival_time_list_.end(); it++) {
-	if (it==arrival_time_list_.begin()) {
+      for(std::list<ros::Time>::iterator it = stats.arrival_time_list.begin(); it != stats.arrival_time_list.end(); it++) {
+	if (it==stats.arrival_time_list.begin()) {
 	  prev = *it;
 	  continue;
 	}
@@ -121,11 +129,11 @@ void StatisticsLogger::callback(const boost::shared_ptr<M_string>& connection_he
 	    msg.period_max = period;
 	prev = *it;
       }
-      msg.period_mean /= (arrival_time_list_.size()-1);
+      msg.period_mean /= (stats.arrival_time_list.size()-1);
 
       msg.period_variance = 0;
-      for(std::list<ros::Time>::iterator it = arrival_time_list_.begin(); it != arrival_time_list_.end(); it++) {
-	if (it==arrival_time_list_.begin()) {
+      for(std::list<ros::Time>::iterator it = stats.arrival_time_list.begin(); it != stats.arrival_time_list.end(); it++) {
+	if (it==stats.arrival_time_list.begin()) {
 	  prev = *it;
 	  continue;
 	}
@@ -135,7 +143,7 @@ void StatisticsLogger::callback(const boost::shared_ptr<M_string>& connection_he
 	prev = *it;
 	
       }
-      msg.period_variance /= (arrival_time_list_.size()-1);
+      msg.period_variance /= (stats.arrival_time_list.size()-1);
     } else {
         msg.period_mean = nan("char-sequence");
         msg.period_variance = nan("char-sequence");
@@ -149,12 +157,13 @@ void StatisticsLogger::callback(const boost::shared_ptr<M_string>& connection_he
       }
     pub_.publish(msg);
 
-    delay_list_.clear();
-    arrival_time_list_.clear();
-    dropped_msgs_ = 0;
-    stat_bytes_last_ = bytes_sent;
+    stats.delay_list.clear();
+    stats.arrival_time_list.clear();
+    stats.dropped_msgs = 0;
+    stats.stat_bytes_last = bytes_sent;
 
   }
+  map_[callerid] = stats;
 }
 
 
