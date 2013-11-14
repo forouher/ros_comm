@@ -658,7 +658,8 @@ uint32_t Subscription::handleMessage(const SerializedMessage& m, bool ser, bool 
   }
 
   // TODO: what about locks?
-  statistics_.callback(connection_header,name_,link->getCallerID(),m,link->getStats().bytes_received_,receipt_time, drops>0);
+  if (name_ != "/statistics" && name_ != "/rosout")
+    statistics_.callback(connection_header,name_,link->getCallerID(),m,link->getStats().bytes_received_,receipt_time, drops>0);
 
   // If this link is latched, store off the message so we can immediately pass it to new subscribers later
   if (link->isLatched())
