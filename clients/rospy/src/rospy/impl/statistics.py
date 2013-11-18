@@ -70,6 +70,12 @@ from rospy.impl.tcpros import get_tcpros_handler, DEFAULT_BUFF_SIZE
 
 _logger = logging.getLogger('rospy.impl.statistics')
 
+MAX_WINDOW = 64
+MIN_WINDOW = 4
+
+MAX_ELEMENTS = 100
+MIN_ELEMENTS = 10
+
 # wrap genpy implementation and map it to rospy namespace
 import genpy
 Message = genpy.Message
@@ -127,8 +133,14 @@ class ConnectionStatisticsLogger():
 	self.publisher = publisher
 	self.pub = rospy.Publisher("/statistics", TopicStatistics)
 	self.last_pub_time = rospy.Time(0)
-	self.pub_frequency = rospy.Duration(1.0)
+	self.pub_frequency = rospy.Duration(4.0)
+
+	self.MAX_WINDOW = 64
+	self.MIN_WINDOW = 4
 	
+	self.MAX_ELEMENTS = 100
+	self.MIN_ELEMENTS = 10
+
 	self.stat_bytes_last_ = 0
 	self.stat_bytes_window_ = 0
 
@@ -185,11 +197,16 @@ class ConnectionStatisticsLogger():
 	    msg.period_variance = float('NaN')
             msg.period_max = float('NaN')
 
+        self.pub.publish(msg)
+
+	if len(self.arrival_time_list_) < MIN_ELEMENTS and self.pub_frequency*2 <= MAX_WINDOW:
+	    self.pub_frequency *= 2
+	if len(self.arrival_time_list_) > MAX_ELEMENTS and self.pub_frequency/2 >= MIN_WINDOW:
+	    self.pub_frequency /= 2
+
 	self.delay_list_ = []
 	self.arrival_time_list_ = []
         self.dropped_msgs_ = 0
-
-        self.pub.publish(msg)
 
     def callback(self,msg, stat_bytes):
         """
