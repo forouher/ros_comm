@@ -69,7 +69,7 @@ void StatisticsLogger::callback(const boost::shared_ptr<M_string>& connection_he
   if (dropped)
     stats.dropped_msgs++;
 
-  if (hasHeader_) {
+  if (hasHeader_ && m.num_bytes > 0) {
     // TODO: maybe wrap this with an exception handler,
     // in case serialization fails?
     std_msgs::Header header;
