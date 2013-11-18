@@ -37,7 +37,7 @@ namespace ros
 
 StatisticsLogger::StatisticsLogger()
 {
-  pub_frequency_ = 1.0;
+  pub_frequency_ = 4.0;
 }
 
 StatisticsLogger::~StatisticsLogger()
@@ -81,6 +81,7 @@ void StatisticsLogger::callback(const boost::shared_ptr<M_string>& connection_he
       hasHeader_ = false;
     }
   }
+
 
   if (stats.last_publish + ros::Duration(pub_frequency_) < received_time) {
     ros::Time window_start = stats.last_publish;
@@ -159,7 +160,13 @@ void StatisticsLogger::callback(const boost::shared_ptr<M_string>& connection_he
 	// creating the publisher in the constructor results in a deadlock. so do it here.
         pub_ = n.advertise<rosgraph_msgs::TopicStatistics>("/statistics",1);
       }
+
     pub_.publish(msg);
+
+    if (stats.arrival_time_list.size() < MIN_ELEMENTS && pub_frequency_*2 <= MAX_WINDOW)
+      pub_frequency_ *= 2;
+    if (stats.arrival_time_list.size() > MAX_ELEMENTS && pub_frequency_/2 >= MIN_WINDOW)
+      pub_frequency_ /= 2;
 
     stats.delay_list.clear();
     stats.arrival_time_list.clear();

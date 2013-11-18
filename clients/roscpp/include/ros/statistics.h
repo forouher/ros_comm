@@ -52,6 +52,14 @@ public:
 
 private:
 
+  // these are hard constrains
+  static const int MAX_WINDOW = 64;
+  static const int MIN_WINDOW = 4;
+
+  // these are soft constrains 
+  static const int MAX_ELEMENTS = 100;
+  static const int MIN_ELEMENTS = 10;
+
   bool hasHeader_;
   double pub_frequency_;
   ros::Publisher pub_;
