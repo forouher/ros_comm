@@ -70,16 +70,14 @@ void StatisticsLogger::callback(const boost::shared_ptr<M_string>& connection_he
     stats.dropped_msgs++;
 
 
-  if (hasHeader_ && m.num_bytes > 0) {
-    // TODO: maybe wrap this with an exception handler,
-    // in case serialization fails?
+  if (hasHeader_) {
     try {
-    std_msgs::Header header;
-    ros::serialization::IStream stream(m.buf.get(), m.num_bytes);
-    ros::serialization::deserialize(stream, header);
-    stats.delay_list.push_back((received_time-header.stamp).toSec());
+      std_msgs::Header header;
+      ros::serialization::IStream stream(m.message_start, m.num_bytes - (m.message_start - m.buf.get()));
+      ros::serialization::deserialize(stream, header);
+      stats.delay_list.push_back((received_time-header.stamp).toSec());
     } catch (ros::serialization::StreamOverrunException& e) {
-      ROS_ERROR("Error could not deserialize header. topic=%s, bytes=%i", topic.c_str(), m.num_bytes);
+      ROS_ERROR("Error during header extraction for statistics (topic=%s, m.length=%li)", topic.c_str(), m.num_bytes - (m.message_start - m.buf.get()));
       hasHeader_ = false;
     }
   }
