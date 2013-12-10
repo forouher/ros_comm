@@ -49,7 +49,7 @@ void StatisticsLogger::init(const SubscriptionCallbackHelperPtr& helper) {
 }
 
 void StatisticsLogger::callback(const boost::shared_ptr<M_string>& connection_header,
-				const std::string topic, const std::string callerid, const SerializedMessage& m, const uint64_t bytes_sent,
+				const std::string& topic, const std::string& callerid, const SerializedMessage& m, const uint64_t& bytes_sent,
 				const ros::Time& received_time, const bool dropped)
 {
   struct StatData stats;
