@@ -31,11 +31,13 @@
 #include "ros/this_node.h"
 #include "ros/message_traits.h"
 #include "std_msgs/Header.h"
+#include "ros/param.h"
 
 namespace ros
 {
 
 StatisticsLogger::StatisticsLogger()
+: enable_statistics(false)
 {
   pub_frequency_ = 4.0;
 }
@@ -46,6 +48,7 @@ StatisticsLogger::~StatisticsLogger()
 
 void StatisticsLogger::init(const SubscriptionCallbackHelperPtr& helper) {
   hasHeader_ = helper->hasHeader();
+  param::param("/enable_statistics", enable_statistics, enable_statistics);
 }
 
 void StatisticsLogger::callback(const boost::shared_ptr<M_string>& connection_header,
@@ -53,6 +56,9 @@ void StatisticsLogger::callback(const boost::shared_ptr<M_string>& connection_he
 				const ros::Time& received_time, const bool dropped)
 {
   struct StatData stats;
+
+  if (!enable_statistics)
+    return;
 
   std::map<std::string,struct StatData>::iterator stats_it = map_.find(callerid);
   if (stats_it == map_.end()) {
@@ -94,7 +100,7 @@ void StatisticsLogger::callback(const boost::shared_ptr<M_string>& connection_he
     msg.window_start = window_start;
     msg.window_stop = received_time;
     msg.dropped_msgs = stats.dropped_msgs;
-    msg.traffic = (bytes_sent - stats.stat_bytes_last) / pub_frequency_;
+    msg.traffic = (bytes_sent - stats.stat_bytes_last) / (received_time-window_start).toSec();
 
     if (stats.delay_list.size()>0) {
       msg.stamp_delay_mean = 0;

@@ -60,6 +60,8 @@ private:
   static const int MAX_ELEMENTS = 100;
   static const int MIN_ELEMENTS = 10;
 
+  bool enable_statistics;
+
   bool hasHeader_;
   double pub_frequency_;
   ros::Publisher pub_;
