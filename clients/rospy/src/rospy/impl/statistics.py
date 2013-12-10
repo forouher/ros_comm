@@ -180,10 +180,12 @@ class ConnectionStatisticsLogger():
 	msg.node_sub = self.subscriber
 	msg.node_pub = self.publisher
 
-	msg.traffic = self.stat_bytes_window_ / self.pub_frequency.to_sec()
-
 	msg.window_start = window_start
 	msg.window_stop  = curtime
+
+	delta_t = curtime - window_start
+
+	msg.traffic = self.stat_bytes_window_ / delta_t.to_sec()
 
         msg.dropped_msgs = self.dropped_msgs_
 
