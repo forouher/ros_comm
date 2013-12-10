@@ -80,7 +80,8 @@ MIN_ELEMENTS = 10
 import genpy
 Message = genpy.Message
 
-
+_STATISTICS_TOPIC = "/statistics"
+_ENABLE_STATISTICS = "/enable_statistics"
 
 class SubscriberStatisticsLogger():
     """
@@ -92,9 +93,23 @@ class SubscriberStatisticsLogger():
     def __init__(self, subscriber):
         self.subscriber = subscriber
 	self.connections = dict()
+	self.enabled = self.is_enable_statistics()
         pass
 
+    def is_enable_statistics(self):
+	# we use the same API as sim_time. they avoid the standard rosparam API,
+	# maybe we have to as well, maybe not.
+	master_uri = rosgraph.get_master_uri()
+	m = rospy.core.xmlrpcapi(master_uri)
+	code, msg, val = m.getParam(rospy.names.get_caller_id(), _ENABLE_STATISTICS)
+	if code == 1 and val:
+    	    return True
+	return False
+
     def callback(self,msg,publisher, stat_bytes):
+
+	if not self.enabled:
+	    return
 
 	# create ConnectionStatisticsLogger for new connections
 	logger = self.connections.get(publisher)
@@ -131,15 +146,9 @@ class ConnectionStatisticsLogger():
 	self.topic = topic
         self.subscriber = subscriber
 	self.publisher = publisher
-	self.pub = rospy.Publisher("/statistics", TopicStatistics)
+	self.pub = rospy.Publisher(_STATISTICS_TOPIC, TopicStatistics)
 	self.last_pub_time = rospy.Time(0)
 	self.pub_frequency = rospy.Duration(4.0)
-
-	self.MAX_WINDOW = 64
-	self.MIN_WINDOW = 4
-	
-	self.MAX_ELEMENTS = 100
-	self.MIN_ELEMENTS = 10
 
 	self.stat_bytes_last_ = 0
 	self.stat_bytes_window_ = 0
