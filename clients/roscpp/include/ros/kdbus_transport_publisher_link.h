@@ -25,46 +25,61 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_INTRAPROCESS_SUBSCRIBER_LINK_H
-#define ROSCPP_INTRAPROCESS_SUBSCRIBER_LINK_H
-#include "subscriber_link.h"
-#include "common.h"
+#ifndef ROSCPP_KDBUS_TRANSPORT_PUBLISHER_LINK_H
+#define ROSCPP_KDBUS_TRANSPORT_PUBLISHER_LINK_H
 
-#include <boost/thread/recursive_mutex.hpp>
+#include <ros/transport/kdbus_transport.h>
+#include "common.h"
+#include "publisher_link.h"
+#include "connection.h"
 
 namespace ros
 {
+class Header;
+class Message;
+class Subscription;
+typedef boost::shared_ptr<Subscription> SubscriptionPtr;
+typedef boost::weak_ptr<Subscription> SubscriptionWPtr;
+class Connection;
+typedef boost::shared_ptr<Connection> ConnectionPtr;
 
-class IntraProcessPublisherLink;
-typedef boost::shared_ptr<IntraProcessPublisherLink> IntraProcessPublisherLinkPtr;
+class WallTimerEvent;
 
 /**
- * \brief SubscriberLink handles broadcasting messages to a single subscriber on a single topic
+ * \brief Handles a connection to a single publisher on a given topic.  Receives messages from a publisher
+ * and hands them off to its parent Subscription
  */
-class ROSCPP_DECL IntraProcessSubscriberLink : public SubscriberLink
+class ROSCPP_DECL KdbusTransportPublisherLink : public PublisherLink
 {
 public:
-  IntraProcessSubscriberLink(const PublicationPtr& parent);
-  virtual ~IntraProcessSubscriberLink();
+  KdbusTransportPublisherLink(const SubscriptionPtr& parent, const std::string& xmlrpc_uri, const TransportHints& transport_hints);
+  virtual ~KdbusTransportPublisherLink();
 
-  void setSubscriber(const IntraProcessPublisherLinkPtr& subscriber);
-  bool isLatching();
+  //
+  bool initialize(std::string& connection_name);
 
-  virtual void enqueueMessage(const SerializedMessage& m, bool ser, bool nocopy);
-  virtual void drop();
   virtual std::string getTransportType();
   virtual std::string getTransportInfo();
-  virtual bool isIntraprocess() { return true; }
-  virtual void getPublishTypes(bool& ser, bool& nocopy, bool& shmem, const std::type_info& ti);
+  virtual void drop();
 
 private:
-  IntraProcessPublisherLinkPtr subscriber_;
-  bool dropped_;
-  boost::recursive_mutex drop_mutex_;
+
+  /**
+   * \brief Handles handing off a received message to the subscription, where it will be deserialized and called back
+   */
+  virtual void handleMessage(const SerializedMessage& m, bool ser, bool nocopy);
+
+  void onMessage(int events);
+
+  bool dropping_;
+  KDBusTransport transport_;
 
 };
-typedef boost::shared_ptr<IntraProcessSubscriberLink> IntraProcessSubscriberLinkPtr;
+typedef boost::shared_ptr<KdbusTransportPublisherLink> KdbusTransportPublisherLinkPtr;
 
 } // namespace ros
 
-#endif // ROSCPP_INTRAPROCESS_SUBSCRIBER_LINK_H
+#endif // ROSCPP_KDBUS_TRANSPORT_PUBLISHER_LINK_H
+
+
+

@@ -25,46 +25,59 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_INTRAPROCESS_SUBSCRIBER_LINK_H
-#define ROSCPP_INTRAPROCESS_SUBSCRIBER_LINK_H
-#include "subscriber_link.h"
+#ifndef ROSCPP_SHMEM_PUBLISHER_LINK_H
+#define ROSCPP_SHMEM_PUBLISHER_LINK_H
+
+#include "publisher_link.h"
 #include "common.h"
 
 #include <boost/thread/recursive_mutex.hpp>
+#include <boost/thread/thread.hpp>
+#include <ros/message_factory.h>
 
 namespace ros
 {
-
-class IntraProcessPublisherLink;
-typedef boost::shared_ptr<IntraProcessPublisherLink> IntraProcessPublisherLinkPtr;
+class Subscription;
+typedef boost::shared_ptr<Subscription> SubscriptionPtr;
+typedef boost::weak_ptr<Subscription> SubscriptionWPtr;
 
 /**
- * \brief SubscriberLink handles broadcasting messages to a single subscriber on a single topic
+ * \brief Handles a connection to a single publisher on a given topic.  Receives messages from a publisher
+ * and hands them off to its parent Subscription
  */
-class ROSCPP_DECL IntraProcessSubscriberLink : public SubscriberLink
+class ROSCPP_DECL ShmemPublisherLink : public PublisherLink
 {
 public:
-  IntraProcessSubscriberLink(const PublicationPtr& parent);
-  virtual ~IntraProcessSubscriberLink();
+  ShmemPublisherLink(const SubscriptionPtr& parent, const std::string& xmlrpc_uri, const TransportHints& transport_hints);
+  virtual ~ShmemPublisherLink();
 
-  void setSubscriber(const IntraProcessPublisherLinkPtr& subscriber);
-  bool isLatching();
+  void initialize(const std::string& deque_uuid);
 
-  virtual void enqueueMessage(const SerializedMessage& m, bool ser, bool nocopy);
-  virtual void drop();
   virtual std::string getTransportType();
   virtual std::string getTransportInfo();
-  virtual bool isIntraprocess() { return true; }
-  virtual void getPublishTypes(bool& ser, bool& nocopy, bool& shmem, const std::type_info& ti);
+  virtual void drop();
+
+  virtual void threadRunner();
+
+  /**
+   * \brief Handles handing off a received message to the subscription, where it will be deserialized and called back
+   */
+  virtual void handleMessage(const SerializedMessage& m, bool ser, bool nocopy);
+
+  void getPublishTypes(bool& ser, bool& nocopy, const std::type_info& ti);
 
 private:
-  IntraProcessPublisherLinkPtr subscriber_;
   bool dropped_;
   boost::recursive_mutex drop_mutex_;
+  boost::thread thread_;
+  ros::ShmemDeque::Ptr deque_;
 
 };
-typedef boost::shared_ptr<IntraProcessSubscriberLink> IntraProcessSubscriberLinkPtr;
+typedef boost::shared_ptr<ShmemPublisherLink> ShmemPublisherLinkPtr;
 
 } // namespace ros
 
-#endif // ROSCPP_INTRAPROCESS_SUBSCRIBER_LINK_H
+#endif // ROSCPP_SHMEM_PUBLISHER_LINK_H
+
+
+

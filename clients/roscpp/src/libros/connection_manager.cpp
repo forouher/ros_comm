@@ -29,9 +29,12 @@
 #include "ros/poll_manager.h"
 #include "ros/connection.h"
 #include "ros/transport_subscriber_link.h"
+#include "ros/kdbus_transport_subscriber_link.h"
+#include "ros/shmem_subscriber_link.h"
 #include "ros/service_client_link.h"
 #include "ros/transport/transport_tcp.h"
 #include "ros/transport/transport_udp.h"
+#include "ros/transport/transport_kdbus.h"
 #include "ros/file_log.h"
 #include "ros/network.h"
 
@@ -89,6 +92,7 @@ void ConnectionManager::start()
     ROS_FATAL("Listen failed");
     ROS_BREAK();
   }
+
 }
 
 void ConnectionManager::shutdown()
@@ -201,6 +205,19 @@ void ConnectionManager::tcprosAcceptConnection(const TransportTCPPtr& transport)
   addConnection(conn);
 
   conn->initialize(transport, true, boost::bind(&ConnectionManager::onConnectionHeaderReceived, this, _1, _2));
+}
+
+void ConnectionManager::addKdbusConnection(const std::string& topic, const std::string& client_con_name)
+{
+  // TODO
+  KdbusTransportSubscriberLinkPtr sub_link(new KdbusTransportSubscriberLink());
+  sub_link->initialize(topic, client_con_name);
+}
+
+void ConnectionManager::addShmemConnection(const std::string& topic, const std::string& deque_uuid)
+{
+  ShmemSubscriberLinkPtr sub_link(new ShmemSubscriberLink());
+  sub_link->initialize(topic, deque_uuid);
 }
 
 bool ConnectionManager::onConnectionHeaderReceived(const ConnectionPtr& conn, const Header& header)

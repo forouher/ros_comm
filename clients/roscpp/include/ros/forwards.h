@@ -38,6 +38,7 @@
 #include <boost/weak_ptr.hpp>
 #include <boost/function.hpp>
 
+#include <ros/boost_container.h>
 #include <ros/time.h>
 #include <ros/macros.h>
 #include "exceptions.h"
@@ -56,6 +57,8 @@ class Transport;
 typedef boost::shared_ptr<Transport> TransportPtr;
 class TransportTCP;
 typedef boost::shared_ptr<TransportTCP> TransportTCPPtr;
+class TransportKDBus;
+typedef boost::shared_ptr<TransportKDBus> TransportKDBusPtr;
 class TransportUDP;
 typedef boost::shared_ptr<TransportUDP> TransportUDPPtr;
 class Connection;
@@ -88,7 +91,6 @@ class Transport;
 typedef boost::shared_ptr<Transport> TransportPtr;
 class NodeHandle;
 typedef boost::shared_ptr<NodeHandle> NodeHandlePtr;
-
 
 class SingleSubscriberPublisher;
 typedef boost::function<void(const SingleSubscriberPublisher&)> SubscriberStatusCallback;

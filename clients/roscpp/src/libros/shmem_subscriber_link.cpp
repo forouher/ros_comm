@@ -26,8 +26,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "ros/intraprocess_subscriber_link.h"
-#include "ros/intraprocess_publisher_link.h"
+#include "ros/shmem_subscriber_link.h"
 #include "ros/publication.h"
 #include "ros/header.h"
 #include "ros/connection.h"
@@ -42,59 +41,76 @@
 namespace ros
 {
 
-IntraProcessSubscriberLink::IntraProcessSubscriberLink(const PublicationPtr& parent)
+ShmemSubscriberLink::ShmemSubscriberLink()
 : dropped_(false)
 {
-  ROS_ASSERT(parent);
-  parent_ = parent;
-  topic_ = parent->getName();
 }
 
-IntraProcessSubscriberLink::~IntraProcessSubscriberLink()
+ShmemSubscriberLink::~ShmemSubscriberLink()
 {
 }
 
-void IntraProcessSubscriberLink::setSubscriber(const IntraProcessPublisherLinkPtr& subscriber)
+bool ShmemSubscriberLink::isLatching()
 {
-  subscriber_ = subscriber;
-  connection_id_ = ConnectionManager::instance()->getNewConnectionID();
-  destination_caller_id_ = this_node::getName();
-}
-
-bool IntraProcessSubscriberLink::isLatching()
-{
-  if (PublicationPtr parent = parent_.lock())
-  {
-    return parent->isLatching();
-  }
-
   return false;
 }
 
-void IntraProcessSubscriberLink::enqueueMessage(const SerializedMessage& m, bool ser, bool nocopy)
+void ShmemSubscriberLink::enqueueMessage(const SerializedMessage& m, bool ser, bool nocopy)
 {
   boost::recursive_mutex::scoped_lock lock(drop_mutex_);
+
+  boost::interprocess::scoped_lock<boost::interprocess::interprocess_mutex> lock2(deque_->mutex_);
+
+  if (m.uuid.is_nil()) {
+//    fprintf(stderr, "UUID is nil\n");
+    return;
+  }
+//  sensor_msgs::PointCloud3* test_msg = ros::MessageFactory::createMessage<sensor_msgs::PointCloud3>();
+
+//  fprintf(stderr, "adding uuid %s to deque\n", boost::uuids::to_string(m.uuid).c_str());
+  deque_->add(m.uuid);
+  deque_->signal_.notify_one();
+
   if (dropped_)
   {
     return;
   }
-
-  ROS_ASSERT(subscriber_);
-  subscriber_->handleMessage(m, ser, nocopy);
 }
 
-std::string IntraProcessSubscriberLink::getTransportType()
+std::string ShmemSubscriberLink::getTransportType()
 {
-  return std::string("INTRAPROCESS");
+  return std::string("ShmemTransport");
 }
 
-std::string IntraProcessSubscriberLink::getTransportInfo()
+std::string ShmemSubscriberLink::getTransportInfo()
 {
-  // TODO: Check if we can dump more useful information here
-  return getTransportType();
+  return std::string("This is a shmem subscriber link. So, now you know.");
 }
 
-void IntraProcessSubscriberLink::drop()
+void ShmemSubscriberLink::initialize(const std::string& topic, const std::string& deque_uuid)
+{
+  PublicationPtr pt = TopicManager::instance()->lookupPublication(topic);
+  if (!pt)
+  {
+    std::string msg = std::string("received a connection for a nonexistent topic [") +
+                    topic + std::string("].");
+  
+    ROSCPP_LOG_DEBUG("%s", msg.c_str());
+  
+    return;
+  }
+
+  topic_ = topic;
+
+  ROS_DEBUG("Creating shmem deque with UUID %s", deque_uuid.c_str());
+  deque_ = MessageFactory::createDeque(deque_uuid);
+  pt->addSubscriberLink(shared_from_this());
+
+  return;
+
+}
+
+void ShmemSubscriberLink::drop()
 {
   {
     boost::recursive_mutex::scoped_lock lock(drop_mutex_);
@@ -105,22 +121,9 @@ void IntraProcessSubscriberLink::drop()
 
     dropped_ = true;
   }
-
-  if (subscriber_)
-  {
-    subscriber_->drop();
-    subscriber_.reset();
-  }
-
-  if (PublicationPtr parent = parent_.lock())
-  {
-    ROSCPP_LOG_DEBUG("Connection to local subscriber on topic [%s] dropped", topic_.c_str());
-
-    parent->removeSubscriberLink(shared_from_this());
-  }
 }
 
-void IntraProcessSubscriberLink::getPublishTypes(bool& ser, bool& nocopy, bool& shmem, const std::type_info& ti)
+void ShmemSubscriberLink::getPublishTypes(bool& ser, bool& nocopy, bool& shmem, const std::type_info& ti)
 {
   boost::recursive_mutex::scoped_lock lock(drop_mutex_);
   if (dropped_)
@@ -128,7 +131,8 @@ void IntraProcessSubscriberLink::getPublishTypes(bool& ser, bool& nocopy, bool& 
     return;
   }
   shmem = false;
-  subscriber_->getPublishTypes(ser, nocopy, ti);
+  ser = false;
+//  subscriber_->getPublishTypes(ser, nocopy, ti);
 }
 
 } // namespace ros

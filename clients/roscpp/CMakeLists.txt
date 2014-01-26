@@ -5,6 +5,9 @@ find_package(catkin REQUIRED COMPONENTS
   cpp_common message_generation rosconsole roscpp_serialization roscpp_traits rosgraph_msgs rostime std_msgs xmlrpcpp
 )
 
+SET(CMAKE_C_FLAGS "-std=gnu99 -g")
+SET(CMAKE_CXX_FLAGS "-g")
+
 catkin_package_xml()
 # split version in parts and pass to extra file
 string(REPLACE "." ";" roscpp_VERSION_LIST "${roscpp_VERSION}")
@@ -49,7 +52,7 @@ endif()
 
 catkin_package(
   INCLUDE_DIRS include ${CATKIN_DEVEL_PREFIX}/${CATKIN_GLOBAL_INCLUDE_DESTINATION}/ros
-  LIBRARIES roscpp ${PTHREAD_LIB}
+  LIBRARIES roscpp ${PTHREAD_LIB} rt
   CATKIN_DEPENDS cpp_common message_runtime rosconsole roscpp_serialization roscpp_traits rosgraph_msgs rostime std_msgs xmlrpcpp
   DEPENDS Boost
 )
@@ -101,6 +104,10 @@ add_library(roscpp
   src/libros/transport/transport_tcp.cpp
   src/libros/subscriber_link.cpp
   src/libros/service_client_link.cpp
+  src/libros/shmem_publisher_link.cpp
+  src/libros/shmem_subscriber_link.cpp
+  src/libros/kdbus_transport_publisher_link.cpp
+  src/libros/kdbus_transport_subscriber_link.cpp
   src/libros/transport_publisher_link.cpp
   src/libros/transport_subscriber_link.cpp
   src/libros/service_manager.cpp
@@ -114,12 +121,16 @@ add_library(roscpp
   src/libros/poll_set.cpp
   src/libros/service.cpp
   src/libros/this_node.cpp
+  src/libros/memfd_message.cpp
+  src/libros/transport/kdbus-enum.c
+  src/libros/transport/kdbus-util.c
+  src/libros/transport/kdbus_transport.cpp
   )
 
 add_dependencies(roscpp roscpp_gencpp rosgraph_msgs_gencpp std_msgs_gencpp)
 
 target_link_libraries(roscpp
-  ${catkin_LIBRARIES}
+  ${catkin_LIBRARIES} -lrt
   ${Boost_LIBRARIES}
   )
 

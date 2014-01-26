@@ -59,7 +59,23 @@ VoidConstPtr MessageDeserializer::deserialize()
     return msg_;
   }
 
-  if (!serialized_message_.buf && serialized_message_.num_bytes > 0)
+  if (!serialized_message_.uuid.is_nil()) {
+//    fprintf(stderr, "retrieving msg from shmem\n");
+    SubscriptionCallbackHelperDeserializeParams params;
+    params.uuid = serialized_message_.uuid;
+    msg_ = helper_->deserializeShmem(params);
+    return msg_;
+  }
+
+  if (serialized_message_.memfd_message) {
+    SubscriptionCallbackHelperDeserializeParams params;
+    params.memfd_message = serialized_message_.memfd_message;
+    params.connection_header = connection_header_;
+    msg_ = helper_->deserializeMemfd(params);
+    return msg_;
+  }
+
+  if (!serialized_message_.buf)
   {
     // If the buffer has been reset it means we tried to deserialize and failed
     return VoidConstPtr();

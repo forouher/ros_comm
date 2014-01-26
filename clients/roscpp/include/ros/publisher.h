@@ -32,6 +32,7 @@
 #include "ros/common.h"
 #include "ros/message.h"
 #include "ros/serialization.h"
+#include "ros/memfd_serialize.h"
 #include <boost/bind.hpp>
 
 namespace ros
@@ -85,7 +86,7 @@ namespace ros
       m.type_info = &typeid(M);
       m.message = message;
 
-      publish(boost::bind(serializeMessage<M>, boost::ref(*message)), m);
+      publish(boost::bind(serializeMessage<M>, boost::ref(*message)), boost::bind(shmemSerializeMessage<M>, boost::ref(*message)), m);
     }
 
     /**
@@ -115,7 +116,40 @@ namespace ros
                      impl_->datatype_.c_str(), impl_->md5sum_.c_str());
 
       SerializedMessage m;
-      publish(boost::bind(serializeMessage<M>, boost::ref(message)), m);
+
+      publish(boost::bind(serializeMessage<M>, boost::ref(message)), boost::bind(shmemSerializeMessage<M>, boost::ref(message)), m);
+    }
+
+    /**
+     * \brief Publish a message on the topic associated with this Publisher.
+     */
+    template <typename M>
+      void publishShmem(const M& message) const
+    {
+      using namespace serialization;
+      namespace mt = ros::message_traits;
+
+      if (!impl_)
+        {
+          ROS_ASSERT_MSG(false, "Call to publish() on an invalid Publisher");
+          return;
+        }
+
+      if (!impl_->isValid())
+        {
+          ROS_ASSERT_MSG(false, "Call to publish() on an invalid Publisher (topic [%s])", impl_->topic_.c_str());
+          return;
+        }
+
+      ROS_ASSERT_MSG(impl_->md5sum_ == "*" || std::string(mt::md5sum<M>(message)) == "*" || impl_->md5sum_ == mt::md5sum<M>(message),
+                     "Trying to publish message of type [%s/%s] on a publisher with type [%s/%s]",
+                     mt::datatype<M>(message), mt::md5sum<M>(message),
+                     impl_->datatype_.c_str(), impl_->md5sum_.c_str());
+
+      SerializedMessage m;
+      m.uuid = message.uuid;
+
+      publish(boost::bind(serializeMessage<M>, boost::ref(message)), boost::bind(shmemSerializeMessage<M>, boost::ref(message)), m);
     }
 
     /**
@@ -168,7 +202,7 @@ namespace ros
               const std::string& datatype, const NodeHandle& node_handle, 
               const SubscriberCallbacksPtr& callbacks);
 
-    void publish(const boost::function<SerializedMessage(void)>& serfunc, SerializedMessage& m) const;
+    void publish(const boost::function<SerializedMessage(void)>& serfunc, const boost::function<SerializedMessage(void)>& shmemSerfunc, SerializedMessage& m) const;
     void incrementSequence() const;
 
     class ROSCPP_DECL Impl

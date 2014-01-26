@@ -38,6 +38,7 @@
 #include "ros/serialization.h"
 #include "ros/message_event.h"
 #include <ros/static_assert.h>
+#include <ros/memfd_message.h>
 
 #include <boost/type_traits/add_const.hpp>
 #include <boost/type_traits/remove_const.hpp>
@@ -54,6 +55,8 @@ struct SubscriptionCallbackHelperDeserializeParams
   uint8_t* buffer;
   uint32_t length;
   boost::shared_ptr<M_string> connection_header;
+  MemfdMessage::Ptr memfd_message;
+  boost::uuids::uuid uuid;
 };
 
 struct ROSCPP_DECL SubscriptionCallbackHelperCallParams
@@ -71,6 +74,8 @@ class ROSCPP_DECL SubscriptionCallbackHelper
 public:
   virtual ~SubscriptionCallbackHelper() {}
   virtual VoidConstPtr deserialize(const SubscriptionCallbackHelperDeserializeParams&) = 0;
+  virtual VoidConstPtr deserializeMemfd(const SubscriptionCallbackHelperDeserializeParams&) = 0;
+  virtual VoidConstPtr deserializeShmem(const SubscriptionCallbackHelperDeserializeParams&) = 0;
   virtual void call(SubscriptionCallbackHelperCallParams& params) = 0;
   virtual const std::type_info& getTypeInfo() = 0;
   virtual bool isConst() = 0;
@@ -98,11 +103,17 @@ public:
 
   typedef boost::function<void(typename Adapter::Parameter)> Callback;
   typedef boost::function<NonConstTypePtr()> CreateFunction;
+  typedef boost::function<NonConstTypePtr(MemfdMessage::Ptr)> CreateMemfdFunction;
+  typedef boost::function<NonConstTypePtr(const boost::uuids::uuid)> CreateShmemFunction;
 
   SubscriptionCallbackHelperT(const Callback& callback, 
-			      const CreateFunction& create = DefaultMessageCreator<NonConstType>())
+			      const CreateFunction& create = DefaultMessageCreator<NonConstType>(),
+			      const CreateMemfdFunction& createMemfd = DefaultMemfdMessageCreator<NonConstType>(),
+			      const CreateShmemFunction& createShmem = DefaultShmemMessageCreator<NonConstType>())
     : callback_(callback)
     , create_(create)
+    , create_memfd_(createMemfd)
+    , create_shmem_(createShmem)
   { }
 
   void setCreateFunction(const CreateFunction& create)
@@ -113,6 +124,38 @@ public:
   virtual bool hasHeader()
   {
      return message_traits::hasHeader<typename ParameterAdapter<P>::Message>();
+  }
+
+  virtual VoidConstPtr deserializeMemfd(const SubscriptionCallbackHelperDeserializeParams& params)
+  {
+    NonConstTypePtr msg = create_memfd_(params.memfd_message);
+
+    if (!msg)
+    {
+      ROS_DEBUG("Allocation failed for message of type [%s]", getTypeInfo().name());
+      return VoidConstPtr();
+    }
+
+    // ?? my header is empty, anyways
+    //assignSubscriptionConnectionHeader(msg.get(), params.connection_header);
+
+    return VoidConstPtr(msg);
+  }
+
+  virtual VoidConstPtr deserializeShmem(const SubscriptionCallbackHelperDeserializeParams& params)
+  {
+    NonConstTypePtr msg = create_shmem_(params.uuid);
+
+    if (!msg)
+    {
+      ROS_DEBUG("Allocation failed for message of type [%s]", getTypeInfo().name());
+      return VoidConstPtr();
+    }
+
+    // ?? my header is empty, anyways
+    //assignSubscriptionConnectionHeader(msg.get(), params.connection_header);
+
+    return VoidConstPtr(msg);
   }
 
   virtual VoidConstPtr deserialize(const SubscriptionCallbackHelperDeserializeParams& params)
@@ -157,6 +200,8 @@ public:
 private:
   Callback callback_;
   CreateFunction create_;
+  CreateMemfdFunction create_memfd_;
+  CreateShmemFunction create_shmem_;
 };
 
 }

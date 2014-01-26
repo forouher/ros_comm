@@ -32,6 +32,7 @@
 #include "ros/single_subscriber_publisher.h"
 #include "ros/serialization.h"
 #include <std_msgs/Header.h>
+#include <ros/memfd_message.h>
 
 namespace ros
 {
@@ -87,7 +88,7 @@ Publication::Publication(const std::string &name,
   max_queue_(max_queue),
   seq_(0),
   dropped_(false),
-  latch_(latch),
+  latch_(false),
   has_header_(has_header),
   intraprocess_subscriber_count_(0)
 {
@@ -162,10 +163,10 @@ bool Publication::enqueueMessage(const SerializedMessage& m)
     return false;
   }
 
-  ROS_ASSERT(m.buf);
+  ROS_ASSERT(m.buf || m.memfd_message);
 
   uint32_t seq = incrementSequence();
-  if (has_header_)
+  if (has_header_ && m.buf)
   {
     // If we have a header, we know it's immediately after the message length
     // Deserialize it, write the sequence, and then serialize it again.
@@ -182,11 +183,13 @@ bool Publication::enqueueMessage(const SerializedMessage& m)
       i != subscriber_links_.end(); ++i)
   {
     const SubscriberLinkPtr& sub_link = (*i);
-    sub_link->enqueueMessage(m, true, false);
+/*    if (!sub_link->isShmem()) */
+      sub_link->enqueueMessage(m, true, false);
   }
 
   if (latch_)
   {
+    ROS_DEBUG("Storing message for latching");
     last_message_ = m;
   }
 
@@ -211,7 +214,7 @@ void Publication::addSubscriberLink(const SubscriberLinkPtr& sub_link)
     }
   }
 
-  if (latch_ && last_message_.buf)
+  if (latch_ && last_message_.buf && last_message_.memfd_message->buf_)
   {
     sub_link->enqueueMessage(last_message_, true, true);
   }
@@ -373,7 +376,7 @@ uint32_t Publication::getNumSubscribers()
   return (uint32_t)subscriber_links_.size();
 }
 
-void Publication::getPublishTypes(bool& serialize, bool& nocopy, const std::type_info& ti)
+void Publication::getPublishTypes(bool& serialize, bool& nocopy, bool& shmem, const std::type_info& ti)
 {
   boost::mutex::scoped_lock lock(subscriber_links_mutex_);
   V_SubscriberLink::const_iterator it = subscriber_links_.begin();
@@ -383,11 +386,13 @@ void Publication::getPublishTypes(bool& serialize, bool& nocopy, const std::type
     const SubscriberLinkPtr& sub = *it;
     bool s = false;
     bool n = false;
-    sub->getPublishTypes(s, n, ti);
+    bool sm = false;
+    sub->getPublishTypes(s, n, sm, ti);
     serialize = serialize || s;
     nocopy = nocopy || n;
+    shmem = shmem || sm;
 
-    if (serialize && nocopy)
+    if (serialize && nocopy && shmem)
     {
       break;
     }
@@ -402,7 +407,7 @@ bool Publication::hasSubscribers()
 
 void Publication::publish(SerializedMessage& m)
 {
-  if (m.message)
+  if (m.message || m.memfd_message || !m.uuid.is_nil())
   {
     boost::mutex::scoped_lock lock(subscriber_links_mutex_);
     V_SubscriberLink::const_iterator it = subscriber_links_.begin();
@@ -410,16 +415,24 @@ void Publication::publish(SerializedMessage& m)
     for (; it != end; ++it)
     {
       const SubscriberLinkPtr& sub = *it;
-      if (sub->isIntraprocess())
+      if ((m.message && sub->isIntraprocess()) || !m.uuid.is_nil())
       {
         sub->enqueueMessage(m, false, true);
       }
+
+/*    // This looks like a good idea, but it is unreliable.
+      // maybe there are threading issues?
+      if (m.memfd_message && sub->isShmem())
+      {
+        sub->enqueueMessage(m, false, true);
+      }
+*/
     }
 
     m.message.reset();
   }
 
-  if (m.buf)
+  if (m.uuid.is_nil() && (m.buf || m.memfd_message))
   {
     boost::mutex::scoped_lock lock(publish_queue_mutex_);
     publish_queue_.push_back(m);

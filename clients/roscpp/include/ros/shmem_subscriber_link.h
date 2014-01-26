@@ -31,39 +31,37 @@
 #include "common.h"
 
 #include <boost/thread/recursive_mutex.hpp>
+#include <ros/message_factory.h>
 
 namespace ros
 {
 
-class IntraProcessPublisherLink;
-typedef boost::shared_ptr<IntraProcessPublisherLink> IntraProcessPublisherLinkPtr;
-
 /**
  * \brief SubscriberLink handles broadcasting messages to a single subscriber on a single topic
  */
-class ROSCPP_DECL IntraProcessSubscriberLink : public SubscriberLink
+class ROSCPP_DECL ShmemSubscriberLink : public SubscriberLink
 {
 public:
-  IntraProcessSubscriberLink(const PublicationPtr& parent);
-  virtual ~IntraProcessSubscriberLink();
+  ShmemSubscriberLink();
+  virtual ~ShmemSubscriberLink();
 
-  void setSubscriber(const IntraProcessPublisherLinkPtr& subscriber);
   bool isLatching();
+  void initialize(const std::string& topic, const std::string& deque_uuid);
 
   virtual void enqueueMessage(const SerializedMessage& m, bool ser, bool nocopy);
   virtual void drop();
   virtual std::string getTransportType();
   virtual std::string getTransportInfo();
-  virtual bool isIntraprocess() { return true; }
+  virtual bool isIntraprocess() { return false; }
   virtual void getPublishTypes(bool& ser, bool& nocopy, bool& shmem, const std::type_info& ti);
 
 private:
-  IntraProcessPublisherLinkPtr subscriber_;
   bool dropped_;
   boost::recursive_mutex drop_mutex_;
+  ros::ShmemDeque::Ptr deque_;
 
 };
-typedef boost::shared_ptr<IntraProcessSubscriberLink> IntraProcessSubscriberLinkPtr;
+typedef boost::shared_ptr<ShmemSubscriberLink> ShmemSubscriberLinkPtr;
 
 } // namespace ros
 

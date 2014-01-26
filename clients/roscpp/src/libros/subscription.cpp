@@ -43,11 +43,14 @@
 #include "ros/subscription.h"
 #include "ros/publication.h"
 #include "ros/transport_publisher_link.h"
+#include "ros/kdbus_transport_publisher_link.h"
 #include "ros/intraprocess_publisher_link.h"
 #include "ros/intraprocess_subscriber_link.h"
 #include "ros/connection.h"
 #include "ros/transport/transport_tcp.h"
 #include "ros/transport/transport_udp.h"
+#include "ros/transport/transport_kdbus.h"
+#include "ros/shmem_publisher_link.h"
 #include "ros/callback_queue_interface.h"
 #include "ros/this_node.h"
 #include "ros/network.h"
@@ -58,6 +61,9 @@
 #include "ros/file_log.h"
 #include "ros/transport_hints.h"
 #include "ros/subscription_callback_helper.h"
+#include <boost/uuid/uuid.hpp>            // uuid class
+#include <boost/uuid/uuid_generators.hpp> // generators
+#include <boost/uuid/uuid_io.hpp>
 
 #include <boost/make_shared.hpp>
 
@@ -336,10 +342,20 @@ bool Subscription::pubUpdate(const V_string& new_pubs)
   return retval;
 }
 
+std::string Subscription::replaceStrChar(std::string str, char ch1, char ch2) {
+
+  for (int i = 0; i < str.length(); ++i) {
+    if (str[i] == ch1)
+      str[i] = ch2;
+  }
+  return str;
+}
+
 bool Subscription::negotiateConnection(const std::string& xmlrpc_uri)
 {
   XmlRpcValue tcpros_array, protos_array, params;
-  XmlRpcValue udpros_array;
+  XmlRpcValue udpros_array, kdbusros_array;
+  XmlRpcValue shmemros_array;
   TransportUDPPtr udp_transport;
   int protos = 0;
   V_string transports = transport_hints_.getTransports();
@@ -375,11 +391,30 @@ bool Subscription::negotiateConnection(const std::string& xmlrpc_uri)
       udpros_array[4] = max_datagram_size;
 
       protos_array[protos++] = udpros_array;
+      ROS_DEBUG("Adding UDP as proto offer");
     }
     else if (*it == "TCP")
     {
       tcpros_array[0] = std::string("TCPROS");
       protos_array[protos++] = tcpros_array;
+      ROS_DEBUG("Adding TCP as proto offer");
+    }
+    else if (*it == "KDBus")
+    {
+      std::string my_endpoint_name = "m"+getName() + "hohoho" + this_node::getName();
+      my_endpoint_name = replaceStrChar(my_endpoint_name, '/', '.');
+      kdbusros_array[0] = std::string("KDBusROS");
+      kdbusros_array[1] = my_endpoint_name;
+//      protos_array[protos++] = kdbusros_array;
+//      ROS_DEBUG("Adding KDBus as proto offer");
+    }
+    else if (*it == "Shmem")
+    {
+      boost::uuids::uuid uuid = boost::uuids::random_generator()();
+      shmemros_array[0] = std::string("ShmemROS");
+      shmemros_array[1] = boost::uuids::to_string(uuid); // UUID of Deque
+      protos_array[protos++] = shmemros_array;
+      ROS_DEBUG("Adding Shmem as proto offer");
     }
     else
     {
@@ -526,6 +561,40 @@ void Subscription::pendingConnectionDone(const PendingConnectionPtr& conn, XmlRp
     	ROSCPP_LOG_DEBUG("Failed to connect to publisher of topic [%s] at [%s:%d]", name_.c_str(), pub_host.c_str(), pub_port);
     }
   }
+  else if (proto_name == "ShmemROS")
+  {
+    if (proto.size() != 2 ||
+        proto[1].getType() != XmlRpcValue::TypeString)
+    {
+    	ROSCPP_LOG_DEBUG("publisher implements ShmemROS, but the " \
+                "parameters aren't string");
+      return;
+    }
+    ROSCPP_LOG_DEBUG("Connecting via shmemros to topic [%s]", name_.c_str());
+    const std::string deque_uuid = proto[1];
+
+    ShmemPublisherLinkPtr pub_link(new ShmemPublisherLink(shared_from_this(), xmlrpc_uri, transport_hints_));
+    pub_link->initialize(deque_uuid);
+
+    boost::mutex::scoped_lock lock(publisher_links_mutex_);
+    addPublisherLink(pub_link);
+
+    ROSCPP_LOG_DEBUG("Connected to publisher of topic [%s]", name_.c_str());
+  }
+  else if (proto_name == "KDBusROS")
+  {
+    ROSCPP_LOG_DEBUG("Connecting via kdbusros to topic [%s]", name_.c_str());
+    KdbusTransportPublisherLinkPtr pub_link(new KdbusTransportPublisherLink(shared_from_this(), xmlrpc_uri, transport_hints_));
+
+    std::string my_endpoint_name = "m"+getName() + "hohoho" + this_node::getName();
+    my_endpoint_name = replaceStrChar(my_endpoint_name, '/', '.');
+    pub_link->initialize(my_endpoint_name);
+
+    boost::mutex::scoped_lock lock(publisher_links_mutex_);
+    addPublisherLink(pub_link);
+
+    ROSCPP_LOG_DEBUG("Connected to publisher of topic [%s]", name_.c_str());
+  }
   else if (proto_name == "UDPROS")
   {
     if (proto.size() != 6 ||
@@ -615,7 +684,7 @@ uint32_t Subscription::handleMessage(const SerializedMessage& m, bool ser, bool 
 
     const std::type_info* ti = &info->helper_->getTypeInfo();
 
-    if ((nocopy && m.type_info && *ti == *m.type_info) || (ser && (!m.type_info || *ti != *m.type_info)))
+    if (!m.uuid.is_nil() || m.memfd_message || (nocopy && m.type_info && *ti == *m.type_info) || (ser && (!m.type_info || *ti != *m.type_info)))
     {
       MessageDeserializerPtr deserializer;
 

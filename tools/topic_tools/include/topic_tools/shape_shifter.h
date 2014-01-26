@@ -64,6 +64,8 @@ public:
 
   static bool uses_old_API_;
 
+  boost::shared_ptr<ros::MemfdMessage> mem_;
+
   // Constructor and destructor
   ShapeShifter();
   virtual ~ShapeShifter();
@@ -111,6 +113,9 @@ private:
 // Message traits allow shape shifter to work with the new serialization API
 namespace ros {
 namespace message_traits {
+
+template <> struct IsShmemReady<topic_tools::ShapeShifter> : FalseType { };
+template <> struct IsShmemReady<const topic_tools::ShapeShifter> : FalseType { };
 
 template <> struct IsMessage<topic_tools::ShapeShifter> : TrueType { };
 template <> struct IsMessage<const topic_tools::ShapeShifter> : TrueType { };

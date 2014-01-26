@@ -519,6 +519,8 @@ void removeROSArgs(int argc, const char* const* argv, V_string& args_out)
     {
       args_out.push_back(arg);
     }
+
+
   }
 }
 

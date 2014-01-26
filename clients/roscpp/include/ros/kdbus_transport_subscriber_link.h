@@ -25,46 +25,44 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_INTRAPROCESS_SUBSCRIBER_LINK_H
-#define ROSCPP_INTRAPROCESS_SUBSCRIBER_LINK_H
-#include "subscriber_link.h"
+#ifndef ROSCPP_KDBUS_TRANSPORT_SUBSCRIBER_LINK_H
+#define ROSCPP_KDBUS_TRANSPORT_SUBSCRIBER_LINK_H
 #include "common.h"
+#include "subscriber_link.h"
 
-#include <boost/thread/recursive_mutex.hpp>
+#include <boost/signals/connection.hpp>
+#include <ros/transport/kdbus_transport.h>
 
 namespace ros
 {
 
-class IntraProcessPublisherLink;
-typedef boost::shared_ptr<IntraProcessPublisherLink> IntraProcessPublisherLinkPtr;
-
 /**
  * \brief SubscriberLink handles broadcasting messages to a single subscriber on a single topic
  */
-class ROSCPP_DECL IntraProcessSubscriberLink : public SubscriberLink
+class ROSCPP_DECL KdbusTransportSubscriberLink : public SubscriberLink
 {
 public:
-  IntraProcessSubscriberLink(const PublicationPtr& parent);
-  virtual ~IntraProcessSubscriberLink();
+  KdbusTransportSubscriberLink();
+  virtual ~KdbusTransportSubscriberLink();
 
-  void setSubscriber(const IntraProcessPublisherLinkPtr& subscriber);
-  bool isLatching();
+  //
+  bool initialize(const std::string& topic, const std::string& client_name);
 
   virtual void enqueueMessage(const SerializedMessage& m, bool ser, bool nocopy);
   virtual void drop();
   virtual std::string getTransportType();
   virtual std::string getTransportInfo();
-  virtual bool isIntraprocess() { return true; }
-  virtual void getPublishTypes(bool& ser, bool& nocopy, bool& shmem, const std::type_info& ti);
+
+  virtual bool isShmem() { return true; }
+  virtual void getPublishTypes(bool& ser, bool& nocopy, bool& shmem, const std::type_info& ti) { ser = false; nocopy = false; shmem = true; }
 
 private:
-  IntraProcessPublisherLinkPtr subscriber_;
-  bool dropped_;
-  boost::recursive_mutex drop_mutex_;
-
+  std::string recv_name_;
+  KDBusTransport transport_;
+  std::string topic_;
 };
-typedef boost::shared_ptr<IntraProcessSubscriberLink> IntraProcessSubscriberLinkPtr;
+typedef boost::shared_ptr<KdbusTransportSubscriberLink> KdbusTransportSubscriberLinkPtr;
 
 } // namespace ros
 
-#endif // ROSCPP_INTRAPROCESS_SUBSCRIBER_LINK_H
+#endif // ROSCPP_KDBUS_TRANSPORT_SUBSCRIBER_LINK_H

@@ -36,10 +36,13 @@
 #include "ros/master.h"
 #include "ros/transport/transport_tcp.h"
 #include "ros/transport/transport_udp.h"
+#include "ros/transport/transport_kdbus.h"
 #include "ros/rosout_appender.h"
 #include "ros/init.h"
 #include "ros/file_log.h"
 #include "ros/subscribe_options.h"
+#include <boost/uuid/uuid_generators.hpp> // generators
+#include <boost/uuid/uuid_io.hpp>
 
 #include "XmlRpc.h"
 
@@ -491,7 +494,7 @@ bool TopicManager::registerSubscriber(const SubscriptionPtr& s, const string &da
     return false;
   }
 
-  vector<string> pub_uris;
+  ros::V_string pub_uris;
   for (int i = 0; i < payload.size(); i++)
   {
     if (payload[i] != xmlrpc_manager_->getServerURI())
@@ -553,7 +556,7 @@ bool TopicManager::unregisterSubscriber(const string &topic)
   return true;
 }
 
-bool TopicManager::pubUpdate(const string &topic, const vector<string> &pubs)
+bool TopicManager::pubUpdate(const string &topic, const ros::V_string &pubs)
 {
   SubscriptionPtr sub;
   {
@@ -612,7 +615,70 @@ bool TopicManager::requestTopic(const string &topic,
     }
 
     string proto_name = proto[0];
-    if (proto_name == string("TCPROS"))
+
+    if (proto_name == string("ShmemROS"))
+    {
+      if (proto.size() != 2 ||
+	  proto[1].getType() != XmlRpcValue::TypeString)
+      {
+      	ROSCPP_LOG_DEBUG("Invalid protocol parameters for ShmemROS");
+        return false;
+      }
+
+      // TODO: compare hostnames, abort if not equal
+
+      // TODO: check if publisher type is isShmemReady
+
+      // TODO: compare type_infos. abort if not equal (C++ gives no guaranties about this)
+      //std::string sub_type = proto[2];
+      //PublicationPtr p = lookupPublication(topic);
+
+      std::string deque_uuid = proto[1];
+
+      XmlRpcValue shmemros_params;
+      shmemros_params[0] = "ShmemROS";
+      shmemros_params[1] = proto[1]; // mirror back uuid of deque
+      ret[0] = int(1);
+      ret[1] = string();
+      ret[2] = shmemros_params;
+
+
+      // add this connection endpoint name to the list of ids we send messages to.
+      connection_manager_->addShmemConnection(topic, deque_uuid);
+
+      return true;
+    }
+    else if (proto_name == string("KDBusROS"))
+    {
+      if (proto.size() != 2 ||
+	  proto[1].getType() != XmlRpcValue::TypeString)
+      {
+      	ROSCPP_LOG_DEBUG("Invalid protocol parameters for KDBusROS");
+        return false;
+      }
+
+      // TODO: compare hostnames, abort if not equal
+
+      // TODO: check if publisher type is isShmemReady
+
+      // TODO: compare type_infos. abort if not equal (C++ gives no guaranties about this)
+      //std::string sub_type = proto[2];
+      //PublicationPtr p = lookupPublication(topic);
+
+      XmlRpcValue kdbusros_params;
+      kdbusros_params[0] = "KDBusROS";
+      ret[0] = int(1);
+      ret[1] = string();
+      ret[2] = kdbusros_params;
+
+      std::string sub_conn_id = proto[1];
+
+      // add this connection endpoint name to the list of ids we send messages to.
+      connection_manager_->addKdbusConnection(topic, sub_conn_id);
+
+      return true;
+    }
+    else if (proto_name == string("TCPROS"))
     {
       XmlRpcValue tcpros_params;
       tcpros_params[0] = string("TCPROS");
@@ -702,7 +768,7 @@ bool TopicManager::requestTopic(const string &topic,
   return false;
 }
 
-void TopicManager::publish(const std::string& topic, const boost::function<SerializedMessage(void)>& serfunc, SerializedMessage& m)
+void TopicManager::publish(const std::string& topic, const boost::function<SerializedMessage(void)>& serfunc, const boost::function<SerializedMessage(void)>& shmemSerfunc, SerializedMessage& m)
 {
   boost::recursive_mutex::scoped_lock lock(advertised_topics_mutex_);
 
@@ -720,21 +786,43 @@ void TopicManager::publish(const std::string& topic, const boost::function<Seria
     // do a no-copy publish.
     bool nocopy = false;
     bool serialize = false;
+    bool shmem = false;
+
+    // this is ugly. we have to check if the links support shmem. but this method is not callable
+    // in all situations. so we have to call it twice. better would be to make it safe and just call
+    // it always.
+    p->getPublishTypes(serialize, nocopy, shmem, typeid(void));
+    serialize = false;
+    nocopy = false;
 
     // We can only do a no-copy publish if a shared_ptr to the message is provided, and we have type information for it
-    if (m.type_info && m.message)
+    if ((m.type_info && m.message) || !m.uuid.is_nil())
     {
-      p->getPublishTypes(serialize, nocopy, *m.type_info);
+      p->getPublishTypes(serialize, nocopy, shmem, *m.type_info);
     }
     else
     {
       serialize = true;
+      nocopy = false;
     }
+//    fprintf(stderr,"C s=%i, n=%i,sm=%i\n", serialize, nocopy, shmem);
 
     if (!nocopy)
     {
       m.message.reset();
       m.type_info = 0;
+    }
+
+    if (!m.uuid.is_nil()) {
+//        fprintf(stderr,"got UUID msg: %s\n", boost::uuids::to_string(m.uuid).c_str());
+    }
+
+    // TODO: latching will not work yet, as messages cannot be sent twice
+    if ((shmem || p->isLatching()) && m.uuid.is_nil()) {
+      SerializedMessage m2 = shmemSerfunc();
+      m.memfd_message = m2.memfd_message;
+      ROS_ASSERT(m.memfd_message);
+      ROS_ASSERT(m.memfd_message->buf_);
     }
 
     if (serialize || p->isLatching())
@@ -749,7 +837,7 @@ void TopicManager::publish(const std::string& topic, const boost::function<Seria
 
     // If we're not doing a serialized publish we don't need to signal the pollset.  The write()
     // call inside signal() is actually relatively expensive when doing a nocopy publish.
-    if (serialize)
+    if (serialize || shmem || !m.uuid.is_nil())
     {
       poll_manager_->getPollSet().signal();
     }
@@ -1006,10 +1094,10 @@ extern std::string console::g_last_error_message;
 
 void TopicManager::pubUpdateCallback(XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
 {
-  std::vector<std::string> pubs;
+  V_string pubs;
   for (int idx = 0; idx < params[2].size(); idx++)
   {
-    pubs.push_back(params[2][idx]);
+    pubs.push_back((std::string)params[2][idx]);
   }
   if (pubUpdate(params[1], pubs))
   {

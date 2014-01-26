@@ -26,8 +26,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "ros/intraprocess_subscriber_link.h"
-#include "ros/intraprocess_publisher_link.h"
+#include "ros/kdbus_transport_subscriber_link.h"
 #include "ros/publication.h"
 #include "ros/header.h"
 #include "ros/connection.h"
@@ -36,99 +35,80 @@
 #include "ros/connection_manager.h"
 #include "ros/topic_manager.h"
 #include "ros/file_log.h"
+#include "ros/memfd_message.h"
 
 #include <boost/bind.hpp>
 
 namespace ros
 {
 
-IntraProcessSubscriberLink::IntraProcessSubscriberLink(const PublicationPtr& parent)
-: dropped_(false)
+KdbusTransportSubscriberLink::KdbusTransportSubscriberLink()
+ : transport_("1000-ros")
 {
-  ROS_ASSERT(parent);
-  parent_ = parent;
-  topic_ = parent->getName();
+
 }
 
-IntraProcessSubscriberLink::~IntraProcessSubscriberLink()
+KdbusTransportSubscriberLink::~KdbusTransportSubscriberLink()
 {
+  drop();
 }
 
-void IntraProcessSubscriberLink::setSubscriber(const IntraProcessPublisherLinkPtr& subscriber)
+bool KdbusTransportSubscriberLink::initialize(const std::string& topic, const std::string& client_name)
 {
-  subscriber_ = subscriber;
-  connection_id_ = ConnectionManager::instance()->getNewConnectionID();
-  destination_caller_id_ = this_node::getName();
-}
+  ROS_DEBUG("KdbusTransportSubscriberLink::initialize(%s,%s)", topic.c_str(), client_name.c_str());
 
-bool IntraProcessSubscriberLink::isLatching()
-{
-  if (PublicationPtr parent = parent_.lock())
+  PublicationPtr pt = TopicManager::instance()->lookupPublication(topic);
+  if (!pt)
   {
-    return parent->isLatching();
+    std::string msg = std::string("received a connection for a nonexistent topic [") +
+                    topic + std::string("] from [" + client_name + "].");
+
+    ROSCPP_LOG_DEBUG("%s", msg.c_str());
+
+    return false;
   }
 
-  return false;
+  recv_name_ = client_name;
+  topic_ = topic;
+
+  transport_.create_bus();
+  transport_.open_connection("");
+
+  pt->addSubscriberLink(shared_from_this());
+
+  return true;
 }
 
-void IntraProcessSubscriberLink::enqueueMessage(const SerializedMessage& m, bool ser, bool nocopy)
+void KdbusTransportSubscriberLink::enqueueMessage(const SerializedMessage& m, bool ser, bool nocopy)
 {
-  boost::recursive_mutex::scoped_lock lock(drop_mutex_);
-  if (dropped_)
+  ROS_ASSERT_MSG(m.memfd_message, "bad message on topic '%s' to '%s'", topic_.c_str(), recv_name_.c_str());
+
+//  fprintf(stderr, "KdbusTransportSubscriberLink::enqueueMessage with fd=%i\n", m.memfd_message->fd_);
+  ROS_ASSERT_MSG(m.memfd_message->buf_, "buf_ in message is NULL, size_=%lu", m.memfd_message->size_);
+  // TODO: set m.type_info correctly ???
+
+  // check for error. if "no such process", then kill connection.
+  if (!transport_.sendMessage(m.memfd_message, recv_name_))
   {
-    return;
-  }
-
-  ROS_ASSERT(subscriber_);
-  subscriber_->handleMessage(m, ser, nocopy);
-}
-
-std::string IntraProcessSubscriberLink::getTransportType()
-{
-  return std::string("INTRAPROCESS");
-}
-
-std::string IntraProcessSubscriberLink::getTransportInfo()
-{
-  // TODO: Check if we can dump more useful information here
-  return getTransportType();
-}
-
-void IntraProcessSubscriberLink::drop()
-{
-  {
-    boost::recursive_mutex::scoped_lock lock(drop_mutex_);
-    if (dropped_)
-    {
-      return;
-    }
-
-    dropped_ = true;
-  }
-
-  if (subscriber_)
-  {
-    subscriber_->drop();
-    subscriber_.reset();
-  }
-
-  if (PublicationPtr parent = parent_.lock())
-  {
-    ROSCPP_LOG_DEBUG("Connection to local subscriber on topic [%s] dropped", topic_.c_str());
-
-    parent->removeSubscriberLink(shared_from_this());
+    //ROS_ERROR("KDBus subscriber vanished, closing transport");
+    //parent->removeSubscriberLink(shared_from_this());
   }
 }
 
-void IntraProcessSubscriberLink::getPublishTypes(bool& ser, bool& nocopy, bool& shmem, const std::type_info& ti)
+std::string KdbusTransportSubscriberLink::getTransportType()
 {
-  boost::recursive_mutex::scoped_lock lock(drop_mutex_);
-  if (dropped_)
-  {
-    return;
-  }
-  shmem = false;
-  subscriber_->getPublishTypes(ser, nocopy, ti);
+  return "KDBusROS";
+}
+
+std::string KdbusTransportSubscriberLink::getTransportInfo()
+{
+  return std::string("This is a KDBus subscriber link. So, now you know.");
+}
+
+void KdbusTransportSubscriberLink::drop()
+{
+  ROS_DEBUG("KdbusTransportSubscriberLink::drop");
+  // TODO ???
 }
 
 } // namespace ros
