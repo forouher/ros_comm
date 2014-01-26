@@ -99,6 +99,7 @@ add_library(roscpp
   src/libros/file_log.cpp
   src/libros/transport/transport_udp.cpp
   src/libros/transport/transport_tcp.cpp
+  src/libros/transport/transport_kdbus.cpp
   src/libros/subscriber_link.cpp
   src/libros/service_client_link.cpp
   src/libros/transport_publisher_link.cpp

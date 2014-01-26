@@ -44,6 +44,7 @@
 #include "ros/file_log.h"
 #include "ros/poll_manager.h"
 #include "ros/transport/transport_tcp.h"
+#include "ros/transport/transport_kdbus.h"
 #include "ros/timer_manager.h"
 #include "ros/callback_queue.h"
 #include "ros/internal_timer_manager.h"

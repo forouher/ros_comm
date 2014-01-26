@@ -32,6 +32,7 @@
 #include "ros/service_client_link.h"
 #include "ros/transport/transport_tcp.h"
 #include "ros/transport/transport_udp.h"
+#include "ros/transport/transport_kdbus.h"
 #include "ros/file_log.h"
 #include "ros/network.h"
 
@@ -89,6 +90,19 @@ void ConnectionManager::start()
     ROS_FATAL("Listen failed");
     ROS_BREAK();
   }
+
+  // Bring up the TCP listener socket
+  ROS_DEBUG("Creating KDBus transport");
+  kdbusserver_transport_ = TransportKDBusPtr(new TransportKDBus(&poll_manager_->getPollSet()));
+  // DFO: do init here
+  if (!kdbusserver_transport_->listen(network::getTCPROSPort(), 
+				    MAX_TCPROS_CONN_QUEUE, 
+				    boost::bind(&ConnectionManager::kdbusrosAcceptConnection, this, _1)))
+  {
+    ROS_FATAL("Listen on port [%d] failed", network::getTCPROSPort());
+    ROS_BREAK();
+  }
+
 }
 
 void ConnectionManager::shutdown()
@@ -103,6 +117,12 @@ void ConnectionManager::shutdown()
   {
     tcpserver_transport_->close();
     tcpserver_transport_.reset();
+  }
+
+  if (kdbusserver_transport_)
+  {
+    kdbusserver_transport_->close();
+    kdbusserver_transport_.reset();
   }
 
   poll_manager_->removePollThreadListener(poll_conn_);
@@ -133,6 +153,12 @@ void ConnectionManager::clear(Connection::DropReason reason)
 uint32_t ConnectionManager::getTCPPort()
 {
   return tcpserver_transport_->getServerPort();
+}
+
+// DFO: doesnt make sense
+uint32_t ConnectionManager::getKDBusPort()
+{
+  return kdbusserver_transport_->getServerPort();
 }
 
 uint32_t ConnectionManager::getUDPPort()
@@ -196,6 +222,17 @@ void ConnectionManager::tcprosAcceptConnection(const TransportTCPPtr& transport)
 {
   std::string client_uri = transport->getClientURI();
   ROSCPP_LOG_DEBUG("TCPROS received a connection from [%s]", client_uri.c_str());
+
+  ConnectionPtr conn(new Connection());
+  addConnection(conn);
+
+  conn->initialize(transport, true, boost::bind(&ConnectionManager::onConnectionHeaderReceived, this, _1, _2));
+}
+
+void ConnectionManager::kdbusrosAcceptConnection(const TransportKDBusPtr& transport)
+{
+  std::string client_uri = transport->getClientURI();
+  ROSCPP_LOG_DEBUG("KDBusROS received a connection from [%s]", client_uri.c_str());
 
   ConnectionPtr conn(new Connection());
   addConnection(conn);

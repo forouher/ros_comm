@@ -48,6 +48,7 @@
 #include "ros/connection.h"
 #include "ros/transport/transport_tcp.h"
 #include "ros/transport/transport_udp.h"
+#include "ros/transport/transport_kdbus.h"
 #include "ros/callback_queue_interface.h"
 #include "ros/this_node.h"
 #include "ros/network.h"
@@ -340,7 +341,7 @@ bool Subscription::pubUpdate(const V_string& new_pubs)
 bool Subscription::negotiateConnection(const std::string& xmlrpc_uri)
 {
   XmlRpcValue tcpros_array, protos_array, params;
-  XmlRpcValue udpros_array;
+  XmlRpcValue udpros_array, kdbusros_array;
   TransportUDPPtr udp_transport;
   int protos = 0;
   V_string transports = transport_hints_.getTransports();
@@ -376,11 +377,19 @@ bool Subscription::negotiateConnection(const std::string& xmlrpc_uri)
       udpros_array[4] = max_datagram_size;
 
       protos_array[protos++] = udpros_array;
+      ROS_DEBUG("Adding UDP as proto offer");
     }
     else if (*it == "TCP")
     {
       tcpros_array[0] = std::string("TCPROS");
       protos_array[protos++] = tcpros_array;
+      ROS_DEBUG("Adding TCP as proto offer");
+    }
+    else if (*it == "KDBus")
+    {
+      kdbusros_array[0] = std::string("KDBusROS");
+      protos_array[protos++] = kdbusros_array;
+      ROS_DEBUG("Adding KDBus as proto offer");
     }
     else
     {
@@ -507,6 +516,41 @@ void Subscription::pendingConnectionDone(const PendingConnectionPtr& conn, XmlRp
     ROSCPP_LOG_DEBUG("Connecting via tcpros to topic [%s] at host [%s:%d]", name_.c_str(), pub_host.c_str(), pub_port);
 
     TransportTCPPtr transport(new TransportTCP(&PollManager::instance()->getPollSet()));
+    if (transport->connect(pub_host, pub_port))
+    {
+      ConnectionPtr connection(new Connection());
+      TransportPublisherLinkPtr pub_link(new TransportPublisherLink(shared_from_this(), xmlrpc_uri, transport_hints_));
+
+      connection->initialize(transport, false, HeaderReceivedFunc());
+      pub_link->initialize(connection);
+
+      ConnectionManager::instance()->addConnection(connection);
+
+      boost::mutex::scoped_lock lock(publisher_links_mutex_);
+      addPublisherLink(pub_link);
+
+      ROSCPP_LOG_DEBUG("Connected to publisher of topic [%s] at [%s:%d]", name_.c_str(), pub_host.c_str(), pub_port);
+    }
+    else
+    {
+    	ROSCPP_LOG_DEBUG("Failed to connect to publisher of topic [%s] at [%s:%d]", name_.c_str(), pub_host.c_str(), pub_port);
+    }
+  }
+  else if (proto_name == "KDBusROS")
+  {
+    if (proto.size() != 3 ||
+        proto[1].getType() != XmlRpcValue::TypeString ||
+        proto[2].getType() != XmlRpcValue::TypeInt)
+    {
+    	ROSCPP_LOG_DEBUG("publisher implements KDBusROS, but the " \
+                "parameters aren't string,int");
+      return;
+    }
+    std::string pub_host = proto[1];
+    int pub_port = proto[2];
+    ROSCPP_LOG_DEBUG("Connecting via kdbusros to topic [%s] at host [%s:%d]", name_.c_str(), pub_host.c_str(), pub_port);
+
+    TransportKDBusPtr transport(new TransportKDBus(&PollManager::instance()->getPollSet()));
     if (transport->connect(pub_host, pub_port))
     {
       ConnectionPtr connection(new Connection());

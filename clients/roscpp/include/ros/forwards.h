@@ -56,6 +56,8 @@ class Transport;
 typedef boost::shared_ptr<Transport> TransportPtr;
 class TransportTCP;
 typedef boost::shared_ptr<TransportTCP> TransportTCPPtr;
+class TransportKDBus;
+typedef boost::shared_ptr<TransportKDBus> TransportKDBusPtr;
 class TransportUDP;
 typedef boost::shared_ptr<TransportUDP> TransportUDPPtr;
 class Connection;

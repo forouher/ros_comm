@@ -63,9 +63,11 @@ public:
 
   uint32_t getTCPPort();
   uint32_t getUDPPort();
+  uint32_t getKDBusPort();
 
   const TransportTCPPtr& getTCPServerTransport() { return tcpserver_transport_; }
   const TransportUDPPtr& getUDPServerTransport() { return udpserver_transport_; }
+  const TransportKDBusPtr& getKDBusServerTransport() { return kdbusserver_transport_; }
 
   void udprosIncomingConnection(const TransportUDPPtr& transport, Header& header);
 
@@ -81,6 +83,7 @@ private:
 
   bool onConnectionHeaderReceived(const ConnectionPtr& conn, const Header& header);
   void tcprosAcceptConnection(const TransportTCPPtr& transport);
+  void kdbusrosAcceptConnection(const TransportKDBusPtr& transport);
 
   PollManagerPtr poll_manager_;
 
@@ -98,6 +101,7 @@ private:
 
   TransportTCPPtr tcpserver_transport_;
   TransportUDPPtr udpserver_transport_;
+  TransportKDBusPtr kdbusserver_transport_;
 
   const static int MAX_TCPROS_CONN_QUEUE = 100; // magic
 };

@@ -36,6 +36,7 @@
 #include "ros/master.h"
 #include "ros/transport/transport_tcp.h"
 #include "ros/transport/transport_udp.h"
+#include "ros/transport/transport_kdbus.h"
 #include "ros/rosout_appender.h"
 #include "ros/init.h"
 #include "ros/file_log.h"
@@ -612,7 +613,19 @@ bool TopicManager::requestTopic(const string &topic,
     }
 
     string proto_name = proto[0];
-    if (proto_name == string("TCPROS"))
+
+    if (proto_name == string("KDBusROS"))
+    {
+      XmlRpcValue kdbusros_params;
+      kdbusros_params[0] = string("KDBusROS");
+      kdbusros_params[1] = network::getHost();
+      kdbusros_params[2] = int(connection_manager_->getKDBusPort());
+      ret[0] = int(1);
+      ret[1] = string();
+      ret[2] = kdbusros_params;
+      return true;
+    }
+    else if (proto_name == string("TCPROS"))
     {
       XmlRpcValue tcpros_params;
       tcpros_params[0] = string("TCPROS");

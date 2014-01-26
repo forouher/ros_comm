@@ -59,6 +59,7 @@ public:
    */
   TransportHints& reliable()
   {
+    kdbus();
     tcp();
 
     return *this;
@@ -70,6 +71,15 @@ public:
   TransportHints& tcp()
   {
     transports_.push_back("TCP");
+    return *this;
+  }
+
+  /**
+   * \brief Explicitly specifies the TCP transport
+   */
+  TransportHints& kdbus()
+  {
+    transports_.push_back("KDBus");
     return *this;
   }
 
