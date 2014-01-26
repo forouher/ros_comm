@@ -34,6 +34,7 @@
 #include "ros/forwards.h"
 #include "ros/transport_hints.h"
 #include "ros/xmlrpc_manager.h"
+#include "ros/boost_container.h"
 #include "XmlRpc.h"
 
 #include <boost/thread.hpp>
@@ -79,7 +80,7 @@ public:
    * \brief Handle a publisher update list received from the master. Creates/drops PublisherLinks based on
    * the list.  Never handles new self-subscriptions
    */
-  bool pubUpdate(const std::vector<std::string> &pubs);
+  bool pubUpdate(const ros::V_string &pubs);
   /**
    * \brief Negotiates a connection with a publisher
    * \param xmlrpc_uri The XMLRPC URI to connect to to negotiate the connection

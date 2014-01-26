@@ -491,7 +491,7 @@ bool TopicManager::registerSubscriber(const SubscriptionPtr& s, const string &da
     return false;
   }
 
-  vector<string> pub_uris;
+  ros::V_string pub_uris;
   for (int i = 0; i < payload.size(); i++)
   {
     if (payload[i] != xmlrpc_manager_->getServerURI())
@@ -553,7 +553,7 @@ bool TopicManager::unregisterSubscriber(const string &topic)
   return true;
 }
 
-bool TopicManager::pubUpdate(const string &topic, const vector<string> &pubs)
+bool TopicManager::pubUpdate(const string &topic, const ros::V_string &pubs)
 {
   SubscriptionPtr sub;
   {
@@ -1006,10 +1006,10 @@ extern ROSOutAppenderPtr g_rosout_appender;
 
 void TopicManager::pubUpdateCallback(XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
 {
-  std::vector<std::string> pubs;
+  V_string pubs;
   for (int idx = 0; idx < params[2].size(); idx++)
   {
-    pubs.push_back(params[2][idx]);
+    pubs.push_back((std::string)params[2][idx]);
   }
   if (pubUpdate(params[1], pubs))
   {

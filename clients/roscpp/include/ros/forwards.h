@@ -38,6 +38,7 @@
 #include <boost/weak_ptr.hpp>
 #include <boost/function.hpp>
 
+#include <ros/boost_container.h>
 #include <ros/time.h>
 #include <ros/macros.h>
 #include "exceptions.h"
@@ -89,7 +90,7 @@ class NodeHandle;
 typedef boost::shared_ptr<NodeHandle> NodeHandlePtr;
 
 typedef std::vector<std::pair<std::string, std::string> > VP_string;
-typedef std::vector<std::string> V_string;
+typedef ros::messages::types::vector<ros::messages::types::string> V_string;
 typedef std::set<std::string> S_string;
 typedef std::map<std::string, std::string> M_string;
 typedef std::pair<std::string, std::string> StringPair;

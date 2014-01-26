@@ -207,7 +207,7 @@ private:
    *
    * @return true on success, false otherwise.
    */
-  bool pubUpdate(const std::string &topic, const std::vector<std::string> &pubs);
+  bool pubUpdate(const std::string &topic, const ros::V_string &pubs);
 
   void pubUpdateCallback(XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result);
   void requestTopicCallback(XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result);
