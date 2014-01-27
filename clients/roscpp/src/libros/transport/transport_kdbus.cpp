@@ -85,7 +85,7 @@ namespace ros
 bool TransportKDBus::s_use_keepalive_ = true;
 bool TransportKDBus::s_use_ipv6_ = false;
 
-TransportKDBus::TransportKDBus(PollSet* poll_set, int flags)
+TransportKDBus::TransportKDBus(PollSet* poll_set, int flags, int fd)
 : sock_(ROS_INVALID_SOCKET)
 , closed_(false)
 , expecting_read_(false)
@@ -94,6 +94,7 @@ TransportKDBus::TransportKDBus(PollSet* poll_set, int flags)
 , server_port_(-1)
 , poll_set_(poll_set)
 , flags_(flags)
+, fdc(fd)
 {
 }
 
@@ -243,6 +244,8 @@ bool TransportKDBus::connect(const std::string& host, int port)
 
   setNonBlocking();
 
+  // create a kdbus connection. the name of the connection must be known to the server...
+
   sockaddr_storage sas;
   socklen_t sas_len;
 
@@ -362,6 +365,23 @@ bool TransportKDBus::connect(const std::string& host, int port)
     ROSCPP_LOG_DEBUG("Async connect() in progress to [%s:%d] on socket [%d]", host.c_str(), port, sock_);
   }
 
+  // everythings okay, now open kdbus connection
+    int fd = -1;
+    if(sas.ss_family == AF_INET) {
+      sockaddr_storage sas;
+      socklen_t sas_len = sizeof(sas);
+      getsockname(sock_, (sockaddr *)&sas, &sas_len);
+      sockaddr_in* saip4 = (sockaddr_in*)&sas;
+      std::ostringstream stringStream;
+      stringStream << "r_" << saip4->sin_port;
+      fd = open_connection(stringStream.str());
+    } else {
+      ROS_ERROR("kdbus: dummy connection is not INET4");
+      return TransportKDBusPtr();
+    }
+
+  ROS_DEBUG("connect: getClientURI()==%s", getClientURI().c_str());
+
   return true;
 }
 
@@ -383,10 +403,10 @@ int TransportKDBus::create_bus() {
 
 	int ret;
 
-	printf("-- opening /dev/kdbus/control\n");
+	ROS_DEBUG("-- opening /dev/kdbus/control");
 	fdc = open("/dev/kdbus/control", O_RDWR|O_CLOEXEC);
 	if (fdc < 0) {
-		fprintf(stderr, "--- error %d (%m)\n", fdc);
+		ROS_ERROR("--- error %d (%m)", fdc);
 		return EXIT_FAILURE;
 	}
 
@@ -403,10 +423,10 @@ int TransportKDBus::create_bus() {
 			     sizeof(bus_make.bs) +
 			     bus_make.n_size;
 
-	printf("-- creating bus '%s'\n", bus_make.name);
+	ROS_DEBUG("-- creating bus '%s'", bus_make.name);
 	ret = ioctl(fdc, KDBUS_CMD_BUS_MAKE, &bus_make);
 	if (ret) {
-		fprintf(stderr, "--- error %d (%m)\n", ret);
+		ROS_ERROR("--- error %d (%m)", ret);
 		return EXIT_FAILURE;
 	}
 
@@ -419,10 +439,10 @@ bool TransportKDBus::listen(int port, int backlog, const AcceptCallback& accept_
   is_server_ = true;
   accept_cb_ = accept_cb;
 
-  create_bus();
-
   bus = "1000-ros"; // TODO
   buspath = "/dev/kdbus/"+bus+"/bus";
+
+  create_bus();
 
   if (s_use_ipv6_)
   {
@@ -491,9 +511,12 @@ void TransportKDBus::close()
     {
       boost::recursive_mutex::scoped_lock lock(close_mutex_);
 
+
       if (!closed_)
       {
         closed_ = true;
+
+        close_connection();
 
         ROS_ASSERT(sock_ != ROS_INVALID_SOCKET);
 
@@ -580,6 +603,8 @@ int32_t TransportKDBus::write(uint8_t* buffer, uint32_t size)
   }
 
   ROS_ASSERT(size > 0);
+
+//  ROS_DEBUG("ich sollte jetzt eine msg an %s senden", get_remote_connection_name().c_str());
 
   // never write more than INT_MAX since this is the maximum we can report back with the current return type
   uint32_t writesize = std::min(size, static_cast<uint32_t>(INT_MAX));
@@ -680,6 +705,24 @@ void TransportKDBus::disableWrite()
   }
 }
 
+std::string TransportKDBus::get_remote_connection_name()
+{
+  ROS_ASSERT(!is_server_);
+
+  sockaddr_storage sas;
+  socklen_t sas_len = sizeof(sas);
+  getpeername(sock_, (sockaddr *)&sas, &sas_len);
+  if(sas.ss_family == AF_INET) {
+      sockaddr_in* saip4 = (sockaddr_in*)&sas;
+      std::ostringstream stringStream;
+      stringStream << "r_" << saip4->sin_port;
+      return stringStream.str();
+  } else {
+      ROS_ERROR("kdbus: dummy connection is not INET4");
+      return "";
+  }
+}
+
 TransportKDBusPtr TransportKDBus::accept()
 {
   ROS_ASSERT(is_server_);
@@ -691,12 +734,28 @@ TransportKDBusPtr TransportKDBus::accept()
   {
     ROSCPP_LOG_DEBUG("Accepted connection on socket [%d], new socket [%d]", sock_, new_sock);
 
-    TransportKDBusPtr transport(new TransportKDBus(poll_set_, flags_));
+    // everythings okay, now open kdbus connection
+    int fd = -1;
+    if(client_address.sa_family == AF_INET) {
+      sockaddr_storage sas;
+      socklen_t sas_len = sizeof(sas);
+      getsockname(new_sock, (sockaddr *)&sas, &sas_len);
+      sockaddr_in* saip4 = (sockaddr_in*)&sas;
+      std::ostringstream stringStream;
+      stringStream << "l_" << saip4->sin_port;
+      fd = open_connection(stringStream.str());
+    } else {
+      ROS_ERROR("kdbus: dummy connection is not INET4");
+      return TransportKDBusPtr();
+    }
+
+    TransportKDBusPtr transport(new TransportKDBus(poll_set_, flags_, fd));
     if (!transport->setSocket(new_sock))
     {
       ROS_ERROR("Failed to set socket on transport for socket %d", new_sock);
     }
 
+    ROS_DEBUG("accept: getClientURI()==%s", transport->getClientURI().c_str());
     return transport;
   }
   else
@@ -812,17 +871,15 @@ std::string TransportKDBus::getClientURI()
   return uri.str();
 }
 
-} // namespace ros
-
-/*
-
 int KDBusTransport::destroy_bus() {
 	close(fdc);
 }
 
-int KDBusTransport::open_connection(const std::string& name) {
+int TransportKDBus::open_connection(const std::string& name) {
 	int fdc, ret;
 	int r;
+
+	ROS_DEBUG("Creating kdbus connection '%s'", name.c_str());
 
 	conn = connect_to_bus(buspath.c_str(), 0);
 	if (!conn)
@@ -837,17 +894,18 @@ int KDBusTransport::open_connection(const std::string& name) {
 
 	add_match_empty(conn->fd);
 
-	return 0;
+	return conn->fd;
 
 }
 
-int KDBusTransport::close_connection() {
-	close(conn->fd);
-	free(conn);
+int TransportKDBus::close_connection() {
+//	::close(conn->fd);
+//	free(conn);
 
 }
 
-KDBusMessage KDBusTransport::createMessage() {
+/*
+KDBusMessage TransportKDBus::createMessage() {
 
         int ret;
 
@@ -871,7 +929,7 @@ KDBusMessage KDBusTransport::createMessage() {
 	return m;
 }
 
-int KDBusTransport::sendMessage(KDBusMessage& msg, const std::string& receiver) {
+int TransportKDBus::sendMessage(KDBusMessage& msg, const std::string& receiver) {
 
 	const char* name = receiver.c_str();
 
@@ -935,7 +993,7 @@ int KDBusTransport::sendMessage(KDBusMessage& msg, const std::string& receiver) 
 
 }
 
-KDBusMessage KDBusTransport::receiveMessage() {
+KDBusMessage TransportKDBus::receiveMessage() {
 
 
 	uint64_t off;
@@ -1014,6 +1072,5 @@ KDBusMessage KDBusTransport::receiveMessage() {
 	return retm;
 
 }
-
-} // namespace ros
 */
+} // namespace ros

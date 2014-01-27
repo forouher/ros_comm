@@ -42,6 +42,13 @@
 #include "ros/io.h"
 #include <ros/common.h>
 
+extern "C"
+{
+
+#include "kdbus-util.h"
+#include "kdbus-enum.h"
+}
+
 namespace ros
 {
 
@@ -65,7 +72,7 @@ public:
     SYNCHRONOUS = 1<<0,
   };
 
-  TransportKDBus(PollSet* poll_set, int flags = 0);
+  TransportKDBus(PollSet* poll_set, int flags = 0, int fd = -1);
   virtual ~TransportKDBus();
 
   /**
@@ -128,7 +135,22 @@ private:
   bool initializeSocket();
 
   bool setNonBlocking();
+
+  std::string get_remote_connection_name();
+
   int create_bus();
+  int destroy_bus();
+  int open_connection(const std::string& name);
+  int close_connection();
+
+//  KDBusMessage createMessage();
+
+//  int sendMessage(KDBusMessage& msg, const std::string& receiver);
+
+//  KDBusMessage receiveMessage();
+
+  // connection
+  struct conn *conn;
 
   /**
    * \brief Set the socket to be used by this transport

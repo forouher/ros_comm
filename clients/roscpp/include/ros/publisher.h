@@ -28,11 +28,14 @@
 #ifndef ROSCPP_PUBLISHER_HANDLE_H
 #define ROSCPP_PUBLISHER_HANDLE_H
 
+#include "ros/parameter_adapter.h"
+#include "ros/memfd_message.h"
 #include "ros/forwards.h"
 #include "ros/common.h"
 #include "ros/message.h"
 #include "ros/serialization.h"
 #include <boost/bind.hpp>
+#include <boost/interprocess/managed_external_buffer.hpp>
 
 namespace ros
 {
@@ -50,6 +53,8 @@ namespace ros
     Publisher() {}
     Publisher(const Publisher& rhs);
     ~Publisher();
+
+    boost::shared_ptr<MemfdMessage> createSharedMessage(int size) const;
 
     /**
      * \brief Publish a message on the topic associated with this Publisher.
@@ -81,11 +86,18 @@ namespace ros
                      mt::datatype<M>(*message), mt::md5sum<M>(*message),
                      impl_->datatype_.c_str(), impl_->md5sum_.c_str());
 
+      typedef typename ParameterAdapter<M>::Message PureType;
+      boost::shared_ptr<MemfdMessage> msgPtr = createSharedMessage(500000);
+      boost::interprocess::managed_external_buffer segment(boost::interprocess::create_only, msgPtr->buf_, msgPtr->size_);
+      typename PureType::allocator alloc (segment.get_segment_manager());
+      PureType* m_copy = segment.construct<PureType>("DATA")(*message,alloc);
+
       SerializedMessage m;
       m.type_info = &typeid(M);
       m.message = message;
+      m.memfd_message = msgPtr;
 
-      publish(boost::bind(serializeMessage<M>, boost::ref(*message)), m);
+      publish(boost::bind(serializeMessage<M>, boost::ref(*m_copy)), m);
     }
 
     /**
@@ -114,8 +126,16 @@ namespace ros
                      mt::datatype<M>(message), mt::md5sum<M>(message),
                      impl_->datatype_.c_str(), impl_->md5sum_.c_str());
 
+      typedef typename ParameterAdapter<M>::Message PureType;
+      boost::shared_ptr<MemfdMessage> msgPtr = createSharedMessage(500000);
+      boost::interprocess::managed_external_buffer segment(boost::interprocess::create_only, msgPtr->buf_, msgPtr->size_);
+      typename PureType::allocator alloc (segment.get_segment_manager());
+      PureType* m_copy = segment.construct<PureType>("DATA")(message,alloc);
+
       SerializedMessage m;
-      publish(boost::bind(serializeMessage<M>, boost::ref(message)), m);
+      m.memfd_message = msgPtr;
+
+      publish(boost::bind(serializeMessage<M>, boost::ref(*m_copy)), m);
     }
 
     /**

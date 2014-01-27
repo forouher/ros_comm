@@ -33,6 +33,7 @@ KDBusTransport::KDBusTransport(const std::string& name) {
 
     bus = name;
     buspath = "/dev/kdbus/"+name+"/bus";
+    fdc = 0;
 
 }
 
@@ -90,8 +91,16 @@ int KDBusTransport::destroy_bus() {
 }
 
 int KDBusTransport::open_connection(const std::string& name) {
-	int fdc, ret;
-	int r;
+	int ret, r;
+
+	if (!fdc) {
+	    printf("-- opening /dev/kdbus/control\n");
+	    fdc = open("/dev/kdbus/control", O_RDWR|O_CLOEXEC);
+	    if (fdc < 0) {
+		fprintf(stderr, "--- error %d (%m)\n", fdc);
+		return EXIT_FAILURE;
+	    }
+	}
 
 	conn = connect_to_bus(buspath.c_str(), 0);
 	if (!conn)
@@ -121,7 +130,7 @@ KDBusMessage KDBusTransport::createMessage() {
         int ret;
 
         int memfd = -1;
-        ret = ioctl(conn->fd, KDBUS_CMD_MEMFD_NEW, &memfd);
+        ret = ioctl(fdc, KDBUS_CMD_MEMFD_NEW, &memfd);
         if (ret < 0) {
                 fprintf(stderr, "KDBUS_CMD_MEMFD_NEW failed: %m\n");
 //                return EXIT_FAILURE;

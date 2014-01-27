@@ -65,6 +65,14 @@ VoidConstPtr MessageDeserializer::deserialize()
     return VoidConstPtr();
   }
 
+/*
+  if (serialized_message_.memfd_message) {
+    ROS_DEBUG("Got a kdbus message, skipping deserialization");
+    msg_ = serialized_message_.memfd_message;
+    return msg_;
+  }
+*/
+
   try
   {
     SubscriptionCallbackHelperDeserializeParams params;
