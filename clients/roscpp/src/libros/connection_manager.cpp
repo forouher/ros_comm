@@ -97,7 +97,7 @@ void ConnectionManager::start()
   // DFO: do init here
   if (!kdbusserver_transport_->listen(network::getTCPROSPort(), 
 				    MAX_TCPROS_CONN_QUEUE, 
-				    boost::bind(&ConnectionManager::kdbusrosAcceptConnection, this, _1)))
+				    boost::bind(&ConnectionManager::kdbusrosAcceptConnection, this, _1), "unique_connection_name")) // TODO
   {
     ROS_FATAL("Listen on port [%d] failed", network::getTCPROSPort());
     ROS_BREAK();
