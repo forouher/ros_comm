@@ -87,7 +87,7 @@ namespace ros
                      impl_->datatype_.c_str(), impl_->md5sum_.c_str());
 
       typedef typename ParameterAdapter<M>::Message PureType;
-      boost::shared_ptr<MemfdMessage> msgPtr = createSharedMessage(500000);
+      boost::shared_ptr<MemfdMessage> msgPtr = createSharedMessage(1000000000);
       boost::interprocess::managed_external_buffer segment(boost::interprocess::create_only, msgPtr->buf_, msgPtr->size_);
       typename PureType::allocator alloc (segment.get_segment_manager());
       PureType* m_copy = segment.construct<PureType>("DATA")(*message,alloc);

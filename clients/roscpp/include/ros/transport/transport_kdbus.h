@@ -95,7 +95,7 @@ public:
    * \param backlog defines the maximum length for the queue of pending connections.  Identical to the backlog parameter to the ::listen function
    * \param accept_cb The function to call when a client socket has connected
    */
-  bool listen(int port, int backlog, const AcceptCallback& accept_cb, const std::string& connection_name);
+  bool listen(int port, int backlog, const AcceptCallback& accept_cb);
   /**
    * \brief Accept a connection on a server socket.  Blocks until a connection is available
    */

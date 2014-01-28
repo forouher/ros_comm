@@ -434,7 +434,7 @@ int TransportKDBus::create_bus() {
 
 }
 
-bool TransportKDBus::listen(int port, int backlog, const AcceptCallback& accept_cb, const std::string& connection_name)
+bool TransportKDBus::listen(int port, int backlog, const AcceptCallback& accept_cb)
 {
   is_server_ = true;
   accept_cb_ = accept_cb;

@@ -1,3 +1,4 @@
+
 /*
  * Copyright (C) 2008, Morgan Quigley and Willow Garage, Inc.
  *
@@ -25,45 +26,69 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_INTRAPROCESS_SUBSCRIBER_LINK_H
-#define ROSCPP_INTRAPROCESS_SUBSCRIBER_LINK_H
-#include "subscriber_link.h"
-#include "common.h"
+#include "ros/kdbus_transport_subscriber_link.h"
+#include "ros/publication.h"
+#include "ros/header.h"
+#include "ros/connection.h"
+#include "ros/transport/transport.h"
+#include "ros/this_node.h"
+#include "ros/connection_manager.h"
+#include "ros/topic_manager.h"
+#include "ros/file_log.h"
 
-#include <boost/thread/recursive_mutex.hpp>
+#include <boost/bind.hpp>
 
 namespace ros
 {
 
-class IntraProcessPublisherLink;
-typedef boost::shared_ptr<IntraProcessPublisherLink> IntraProcessPublisherLinkPtr;
-
-/**
- * \brief SubscriberLink handles broadcasting messages to a single subscriber on a single topic
- */
-class ROSCPP_DECL IntraProcessSubscriberLink : public SubscriberLink
+KdbusTransportSubscriberLink::KdbusTransportSubscriberLink()
 {
-public:
-  IntraProcessSubscriberLink(const PublicationPtr& parent);
-  virtual ~IntraProcessSubscriberLink();
 
-  void setSubscriber(const IntraProcessPublisherLinkPtr& subscriber);
-  bool isLatching();
+}
 
-  virtual void enqueueMessage(const SerializedMessage& m, bool ser, bool nocopy);
-  virtual void drop();
-  virtual std::string getTransportType();
-  virtual bool isIntraprocess() { return true; }
-  virtual void getPublishTypes(bool& ser, bool& nocopy, const std::type_info& ti);
+KdbusTransportSubscriberLink::~KdbusTransportSubscriberLink()
+{
+  drop();
+}
 
-private:
-  IntraProcessPublisherLinkPtr subscriber_;
-  bool dropped_;
-  boost::recursive_mutex drop_mutex_;
+bool KdbusTransportSubscriberLink::initialize(const std::string& topic, const std::string& client_name)
+{
+  ROS_DEBUG("KdbusTransportSubscriberLink::initialize(%s,%s)", topic.c_str(), client_name.c_str());
 
-};
-typedef boost::shared_ptr<IntraProcessSubscriberLink> IntraProcessSubscriberLinkPtr;
+  PublicationPtr pt = TopicManager::instance()->lookupPublication(topic);
+  if (!pt)
+  {
+    std::string msg = std::string("received a connection for a nonexistent topic [") +
+                    topic + std::string("] from [" + client_name + "].");
+
+    ROSCPP_LOG_DEBUG("%s", msg.c_str());
+
+    return false;
+  }
+
+  recv_name_ = client_name;
+
+  // TODO: open kdbus write connection
+  pt->addSubscriberLink(shared_from_this());
+
+  return true;
+}
+
+void KdbusTransportSubscriberLink::enqueueMessage(const SerializedMessage& m, bool ser, bool nocopy)
+{
+  // wird aufgerufen!
+  // TODO: send message to subscriber
+}
+
+std::string KdbusTransportSubscriberLink::getTransportType()
+{
+  return "KDBusROS";
+}
+
+void KdbusTransportSubscriberLink::drop()
+{
+  ROS_DEBUG("KdbusTransportSubscriberLink::drop");
+  // TODO ???
+}
 
 } // namespace ros
-
-#endif // ROSCPP_INTRAPROCESS_SUBSCRIBER_LINK_H

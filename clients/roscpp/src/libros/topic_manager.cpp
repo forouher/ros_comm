@@ -616,13 +616,25 @@ bool TopicManager::requestTopic(const string &topic,
 
     if (proto_name == string("KDBusROS"))
     {
+      if (proto.size() != 2 || proto[1].getType() != XmlRpcValue::TypeString)
+      {
+      	ROSCPP_LOG_DEBUG("Invalid protocol parameters for KDBusROS");
+        return false;
+      }
+
+      // TODO: compare hostnames, abort if not equal
+
       XmlRpcValue kdbusros_params;
-      kdbusros_params[0] = string("KDBusROS");
-      kdbusros_params[1] = network::getHost();
-      kdbusros_params[2] = int(connection_manager_->getKDBusPort());
+      kdbusros_params[0] = "KDBusROS";
       ret[0] = int(1);
       ret[1] = string();
       ret[2] = kdbusros_params;
+
+      std::string sub_conn_id = proto[1];
+
+      // add this connection endpoint name to the list of ids we send messages to.
+      connection_manager_->addKdbusConnection(topic, sub_conn_id);
+
       return true;
     }
     else if (proto_name == string("TCPROS"))

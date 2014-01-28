@@ -43,6 +43,7 @@
 #include "ros/subscription.h"
 #include "ros/publication.h"
 #include "ros/transport_publisher_link.h"
+#include "ros/kdbus_transport_publisher_link.h"
 #include "ros/intraprocess_publisher_link.h"
 #include "ros/intraprocess_subscriber_link.h"
 #include "ros/connection.h"
@@ -387,7 +388,9 @@ bool Subscription::negotiateConnection(const std::string& xmlrpc_uri)
     }
     else if (*it == "KDBus")
     {
+      std::string my_endpoint_name = getName() + "_foo_" + this_node::getName();
       kdbusros_array[0] = std::string("KDBusROS");
+      kdbusros_array[1] = my_endpoint_name;
       protos_array[protos++] = kdbusros_array;
       ROS_DEBUG("Adding KDBus as proto offer");
     }
@@ -538,38 +541,15 @@ void Subscription::pendingConnectionDone(const PendingConnectionPtr& conn, XmlRp
   }
   else if (proto_name == "KDBusROS")
   {
-    if (proto.size() != 3 ||
-        proto[1].getType() != XmlRpcValue::TypeString ||
-        proto[2].getType() != XmlRpcValue::TypeInt)
-    {
-    	ROSCPP_LOG_DEBUG("publisher implements KDBusROS, but the " \
-                "parameters aren't string,int");
-      return;
-    }
-    std::string pub_host = proto[1];
-    int pub_port = proto[2];
-    ROSCPP_LOG_DEBUG("Connecting via kdbusros to topic [%s] at host [%s:%d]", name_.c_str(), pub_host.c_str(), pub_port);
+    ROSCPP_LOG_DEBUG("Connecting via kdbusros to topic [%s]", name_.c_str());
+    KdbusTransportPublisherLinkPtr pub_link(new KdbusTransportPublisherLink(shared_from_this(), xmlrpc_uri, transport_hints_));
+    std::string my_endpoint_name = getName() + "_foo_" + this_node::getName();
+    pub_link->initialize(my_endpoint_name);
 
-    TransportKDBusPtr transport(new TransportKDBus(&PollManager::instance()->getPollSet()));
-    if (transport->connect(pub_host, pub_port))
-    {
-      ConnectionPtr connection(new Connection());
-      TransportPublisherLinkPtr pub_link(new TransportPublisherLink(shared_from_this(), xmlrpc_uri, transport_hints_));
+    boost::mutex::scoped_lock lock(publisher_links_mutex_);
+    addPublisherLink(pub_link);
 
-      connection->initialize(transport, false, HeaderReceivedFunc());
-      pub_link->initialize(connection);
-
-      ConnectionManager::instance()->addConnection(connection);
-
-      boost::mutex::scoped_lock lock(publisher_links_mutex_);
-      addPublisherLink(pub_link);
-
-      ROSCPP_LOG_DEBUG("Connected to publisher of topic [%s] at [%s:%d]", name_.c_str(), pub_host.c_str(), pub_port);
-    }
-    else
-    {
-    	ROSCPP_LOG_DEBUG("Failed to connect to publisher of topic [%s] at [%s:%d]", name_.c_str(), pub_host.c_str(), pub_port);
-    }
+    ROSCPP_LOG_DEBUG("Connected to publisher of topic [%s]", name_.c_str());
   }
   else if (proto_name == "UDPROS")
   {

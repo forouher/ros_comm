@@ -173,6 +173,8 @@ void TransportPublisherLink::onMessageLength(const ConnectionPtr& conn, const bo
   connection_->read(len, boost::bind(&TransportPublisherLink::onMessage, this, _1, _2, _3, _4));
 }
 
+// TODO: implement something parallel to this, when a kdbus message arrives
+// SerializedMessage(boost::shared_ptr<MemfdMessage>)
 void TransportPublisherLink::onMessage(const ConnectionPtr& conn, const boost::shared_array<uint8_t>& buffer, uint32_t size, bool success)
 {
   if (!success && !conn)
