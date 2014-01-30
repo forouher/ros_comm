@@ -157,8 +157,6 @@ public:
 
   virtual VoidConstPtr deserializeMemfd(const SubscriptionCallbackHelperDeserializeParams& params)
   {
-    namespace ser = serialization;
-
     NonConstTypePtr msg = create_memfd_(params.memfd_message);
 
     if (!msg)

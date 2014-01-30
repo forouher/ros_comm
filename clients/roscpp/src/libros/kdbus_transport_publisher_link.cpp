@@ -79,7 +79,7 @@ bool KdbusTransportPublisherLink::initialize(std::string& endpoint_name)
   ROS_DEBUG("Adding kdbus connection [%d] to pollset", sock_);
   PollManager::instance()->getPollSet().addSocket(sock_, boost::bind(&KdbusTransportPublisherLink::onMessage, this, _1));
   PollManager::instance()->getPollSet().addEvents(sock_, POLLIN);
-  PollManager::instance()->getPollSet().addEvents(sock_, POLLOUT);
+//  PollManager::instance()->getPollSet().addEvents(sock_, POLLOUT);
   return true;
 }
 

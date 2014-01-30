@@ -57,8 +57,8 @@ struct DefaultMemfdMessageCreator
     ROS_ASSERT(m);
     ROS_ASSERT(m->size_==1000000000);
 
-
     boost::interprocess::managed_external_buffer segment(boost::interprocess::open_only, m->buf_, m->size_);
+    fprintf(stderr, "Opened message with free space of %u\n", segment.get_free_memory());
     M* msg = segment.find<M>("DATA").first;
     ROS_ASSERT(msg != NULL);
 

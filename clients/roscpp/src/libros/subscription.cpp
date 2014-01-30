@@ -636,8 +636,6 @@ uint32_t Subscription::handleMessage(const SerializedMessage& m, bool ser, bool 
 
   uint32_t drops = 0;
 
-  ROS_DEBUG("received sumeting");
-
   // Cache the deserializers by type info.  If all the subscriptions are the same type this has the same performance as before.  If
   // there are subscriptions with different C++ type (but same ROS message type), this now works correctly rather than passing
   // garbage to the messages with different C++ types than the first one.

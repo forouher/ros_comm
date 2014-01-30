@@ -137,112 +137,17 @@ int KDBusTransport::close_connection() {
 
 }
 
-KDBusMessage KDBusTransport::createMessage() {
-        ROS_DEBUG("KDBusTransport::createMessage()");
-
-        int ret;
-
-	printf("-- opening /dev/kdbus/control\n");
-	int fdc2 = open("/dev/kdbus/control", O_RDWR|O_CLOEXEC);
-	if (fdc2 < 0) {
-		fprintf(stderr, "--- error %d (%m)\n", fdc2);
-	}
-
-        int memfd = -1;
-        ret = ioctl(fdc2, KDBUS_CMD_MEMFD_NEW, &memfd);
-        if (ret < 0) {
-                fprintf(stderr, "KDBUS_CMD_MEMFD_NEW failed: %m\n");
-//                return EXIT_FAILURE;
-        }
-
-        const int memfd_size = 200000;
-
-        char* address_fd = (char*)mmap(NULL, memfd_size,PROT_WRITE,MAP_SHARED,memfd,0);
-        if (MAP_FAILED == address_fd) {
-                fprintf(stderr, "mmap() to memfd failed: %m\n");
-//                return EXIT_FAILURE;
-        }
-
-	KDBusMessage m(memfd, address_fd, memfd_size);
-	close(fdc2);
-	return m;
-}
-
-int KDBusTransport::sendMessage(KDBusMessage& msg, const std::string& receiver) {
+bool KDBusTransport::sendMessage(MemfdMessage::Ptr msg, const std::string& receiver) {
 
 	const char* name = receiver.c_str();
 
-        munmap(msg.address_fd,msg.size);
-
-        int ret = ioctl(msg.memfd, KDBUS_CMD_MEMFD_SEAL_SET, true);
-        if (ret < 0) {
-                fprintf(stderr, "memfd sealing failed: %m\n");
-                return EXIT_FAILURE;
-        }
-
-	uint64_t size = sizeof(struct kdbus_msg);
-//	size += KDBUS_ITEM_SIZE(sizeof(struct kdbus_memfd));
-
-	if (name)
-		size += KDBUS_ITEM_SIZE(strlen(name) + 1);
-
-	struct kdbus_msg *kmsg = (kdbus_msg*)malloc(msg.size);
-	if (!kmsg) {
-		fprintf(stderr, "unable to malloc()!?\n");
-		return EXIT_FAILURE;
-	}
-
-	// create new kdbus message
-	memset(kmsg, 0, size);
-	kmsg->size = size;
-	kmsg->src_id = conn->id;
-	kmsg->dst_id = 0; // name defines destination
-	kmsg->cookie = 0;
-	kmsg->payload_type = KDBUS_PAYLOAD_DBUS; // TODO??
-
-	// start with first item
-	struct kdbus_item *item = kmsg->items;
-
-	// start with name
-	if (name) {
-		item->type = KDBUS_ITEM_DST_NAME;
-		item->size = KDBUS_ITEM_HEADER_SIZE + strlen(name) + 1;
-		strcpy(item->str, name);
-		item = KDBUS_ITEM_NEXT(item);
-	}
-
-/*	// next is our memfd
-	item->type = KDBUS_ITEM_PAYLOAD_MEMFD;
-	item->size = KDBUS_ITEM_HEADER_SIZE + sizeof(struct kdbus_memfd);
-	item->memfd.size = 16;
-	item->memfd.fd = msg.memfd;
-	item = KDBUS_ITEM_NEXT(item);
-*/
-	ret = ioctl(conn->fd, KDBUS_CMD_MSG_SEND, kmsg);
-	if (ret < 0) {
-		fprintf(stderr, "error sending message: %d err %d (%m)\n", ret, errno);
-		return EXIT_FAILURE;
-	}
-
-	close(msg.memfd);
-
-	free(kmsg);
-
-	return 0;
-
-}
-
-int KDBusTransport::sendMessage(MemfdMessage::Ptr msg, const std::string& receiver) {
-
-	const char* name = receiver.c_str();
-
-	fprintf(stderr, "Sending msg to -->%s<--\n", name);
+//	fprintf(stderr, "Sending msg to -->%s<--\n", name);
         munmap(msg->buf_,msg->size_);
 
         int ret = ioctl(msg->fd_, KDBUS_CMD_MEMFD_SEAL_SET, true);
         if (ret < 0) {
                 fprintf(stderr, "memfd sealing failed: %m\n");
-                return EXIT_FAILURE;
+                return false;
         }
 
 	uint64_t size = sizeof(struct kdbus_msg);
@@ -254,7 +159,7 @@ int KDBusTransport::sendMessage(MemfdMessage::Ptr msg, const std::string& receiv
 	struct kdbus_msg *kmsg = (kdbus_msg*)malloc(size);
 	if (!kmsg) {
 		fprintf(stderr, "unable to malloc()!?\n");
-		return EXIT_FAILURE;
+		return false;
 	}
 
 	// create new kdbus message
@@ -279,21 +184,21 @@ int KDBusTransport::sendMessage(MemfdMessage::Ptr msg, const std::string& receiv
 	// next is our memfd
 	item->type = KDBUS_ITEM_PAYLOAD_MEMFD;
 	item->size = KDBUS_ITEM_HEADER_SIZE + sizeof(struct kdbus_memfd);
-	item->memfd.size = 16;
+	item->memfd.size = 1000000000;
 	item->memfd.fd = msg->fd_;
 	item = KDBUS_ITEM_NEXT(item);
 
 	ret = ioctl(conn->fd, KDBUS_CMD_MSG_SEND, kmsg);
 	if (ret < 0) {
 		fprintf(stderr, "error sending message: %d err %d (%m)\n", ret, errno);
-		return EXIT_FAILURE;
+		return false;
 	}
 
 	//close(msg.memfd);
 
 	free(kmsg);
 
-	return 0;
+	return true;
 
 }
 
@@ -304,8 +209,6 @@ MemfdMessage::Ptr KDBusTransport::receiveMessage() {
 	uint64_t off;
 	struct kdbus_msg *msg;
 	int ret;
-
-	KDBusMessage retm;
 
 	ret = ioctl(conn->fd, KDBUS_CMD_MSG_RECV, &off);
 	if (ret < 0) {
@@ -332,10 +235,16 @@ MemfdMessage::Ptr KDBusTransport::receiveMessage() {
 			char *buf;
 			uint64_t size;
 
-			buf = (char*)mmap(NULL, 1000000000, PROT_READ, MAP_SHARED, item->memfd.fd, 0);
+		        int ret = ioctl(item->memfd.fd, KDBUS_CMD_MEMFD_SEAL_SET, false);
+		        if (ret < 0) {
+		                fprintf(stderr, "memfd unsealing failed: %m\n");
+		                break;
+		        }
+
+			buf = (char*)mmap(NULL, 1000000000, PROT_WRITE|PROT_READ, MAP_SHARED, item->memfd.fd, 0);
 			ROS_ASSERT(buf != MAP_FAILED);
 
-			int ret = ioctl(item->memfd.fd, KDBUS_CMD_MEMFD_SIZE_GET, &size);
+			ret = ioctl(item->memfd.fd, KDBUS_CMD_MEMFD_SIZE_GET, &size);
 			ROS_ASSERT(ret>=0); // maybe we wanna handle this
 
 			m = MemfdMessage::Ptr(new MemfdMessage(item->memfd.fd,buf,1000000000));

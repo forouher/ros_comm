@@ -84,7 +84,12 @@ void KdbusTransportSubscriberLink::enqueueMessage(const SerializedMessage& m, bo
 
   // TODO: set m.type_info correctly ???
 
-  transport_.sendMessage(m.memfd_message, recv_name_);
+  // check for error. if "no such process", then kill connection.
+  if (!transport_.sendMessage(m.memfd_message, recv_name_))
+  {
+    //ROS_ERROR("KDBus subscriber vanished, closing transport");
+    //parent->removeSubscriberLink(shared_from_this());
+  }
 }
 
 std::string KdbusTransportSubscriberLink::getTransportType()
