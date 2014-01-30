@@ -339,6 +339,15 @@ bool Subscription::pubUpdate(const V_string& new_pubs)
   return retval;
 }
 
+std::string Subscription::replaceStrChar(std::string str, char ch1, char ch2) {
+
+  for (int i = 0; i < str.length(); ++i) {
+    if (str[i] == ch1)
+      str[i] = ch2;
+  }
+  return str;
+}
+
 bool Subscription::negotiateConnection(const std::string& xmlrpc_uri)
 {
   XmlRpcValue tcpros_array, protos_array, params;
@@ -388,7 +397,8 @@ bool Subscription::negotiateConnection(const std::string& xmlrpc_uri)
     }
     else if (*it == "KDBus")
     {
-      std::string my_endpoint_name = getName() + "_foo_" + this_node::getName();
+      std::string my_endpoint_name = "m"+getName() + "hohoho" + this_node::getName();
+      my_endpoint_name = replaceStrChar(my_endpoint_name, '/', '.');
       kdbusros_array[0] = std::string("KDBusROS");
       kdbusros_array[1] = my_endpoint_name;
       protos_array[protos++] = kdbusros_array;
@@ -543,7 +553,9 @@ void Subscription::pendingConnectionDone(const PendingConnectionPtr& conn, XmlRp
   {
     ROSCPP_LOG_DEBUG("Connecting via kdbusros to topic [%s]", name_.c_str());
     KdbusTransportPublisherLinkPtr pub_link(new KdbusTransportPublisherLink(shared_from_this(), xmlrpc_uri, transport_hints_));
-    std::string my_endpoint_name = getName() + "_foo_" + this_node::getName();
+
+    std::string my_endpoint_name = "m"+getName() + "hohoho" + this_node::getName();
+    my_endpoint_name = replaceStrChar(my_endpoint_name, '/', '.');
     pub_link->initialize(my_endpoint_name);
 
     boost::mutex::scoped_lock lock(publisher_links_mutex_);
@@ -624,6 +636,8 @@ uint32_t Subscription::handleMessage(const SerializedMessage& m, bool ser, bool 
 
   uint32_t drops = 0;
 
+  ROS_DEBUG("received sumeting");
+
   // Cache the deserializers by type info.  If all the subscriptions are the same type this has the same performance as before.  If
   // there are subscriptions with different C++ type (but same ROS message type), this now works correctly rather than passing
   // garbage to the messages with different C++ types than the first one.
@@ -640,7 +654,7 @@ uint32_t Subscription::handleMessage(const SerializedMessage& m, bool ser, bool 
 
     const std::type_info* ti = &info->helper_->getTypeInfo();
 
-    if ((nocopy && m.type_info && *ti == *m.type_info) || (ser && (!m.type_info || *ti != *m.type_info)))
+    if (m.memfd_message || (nocopy && m.type_info && *ti == *m.type_info) || (ser && (!m.type_info || *ti != *m.type_info)))
     {
       MessageDeserializerPtr deserializer;
 

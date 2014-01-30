@@ -30,13 +30,6 @@
 #include "ros/node_handle.h"
 #include "ros/topic_manager.h"
 
-extern "C"
-{
-
-#include "ros/transport/kdbus-util.h"
-#include "ros/transport/kdbus-enum.h"
-}
-
 #include <sys/mman.h>
 #include <sys/ioctl.h>
 
@@ -87,27 +80,7 @@ Publisher::~Publisher()
 {
 }
 
-boost::shared_ptr<MemfdMessage> Publisher::createSharedMessage(int size) const
-{
-
-    ROS_DEBUG("Opening /dev/kdbus/control");
-    int fdc = open("/dev/kdbus/control", O_RDWR|O_CLOEXEC);
-    ROS_ASSERT(fdc >= 0);
-
-    int memfd = -1;
-    ROS_DEBUG("Creating new kdbus memfd");
-    int ret = ioctl(fdc, KDBUS_CMD_MEMFD_NEW, &memfd);
-    ROS_ASSERT(ret >= 0);
-
-    ROS_DEBUG("mmap'ing kdbus memfd");
-    char* buf = (char*)mmap(NULL, size,PROT_WRITE,MAP_SHARED,memfd,0);
-    ROS_ASSERT(buf != MAP_FAILED);
-
-    close(fdc);
-    return boost::shared_ptr<MemfdMessage>(new MemfdMessage(memfd, buf, size));
-}
-
-void Publisher::publish(const boost::function<SerializedMessage(void)>& serfunc, SerializedMessage& m) const
+void Publisher::publish(const boost::function<SerializedMessage(void)>& serfunc, const boost::function<SerializedMessage(void)>& shmemSerfunc, SerializedMessage& m) const
 {
   if (!impl_)
   {
@@ -121,7 +94,7 @@ void Publisher::publish(const boost::function<SerializedMessage(void)>& serfunc,
     return;
   }
 
-  TopicManager::instance()->publish(impl_->topic_, serfunc, m);
+  TopicManager::instance()->publish(impl_->topic_, serfunc, shmemSerfunc, m);
 }
 
 void Publisher::incrementSequence() const

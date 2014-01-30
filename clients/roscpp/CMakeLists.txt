@@ -5,7 +5,8 @@ find_package(catkin REQUIRED COMPONENTS
   cpp_common message_generation rosconsole roscpp_serialization roscpp_traits rosgraph_msgs rostime std_msgs xmlrpcpp
 )
 
-SET(CMAKE_C_FLAGS "-std=gnu99")
+SET(CMAKE_C_FLAGS "-std=gnu99 -g")
+SET(CMAKE_CXX_FLAGS "-g")
 
 catkin_package_xml()
 # split version in parts and pass to extra file
@@ -99,7 +100,6 @@ add_library(roscpp
   src/libros/file_log.cpp
   src/libros/transport/transport_udp.cpp
   src/libros/transport/transport_tcp.cpp
-  src/libros/transport/transport_kdbus.cpp
   src/libros/subscriber_link.cpp
   src/libros/service_client_link.cpp
   src/libros/kdbus_transport_publisher_link.cpp
@@ -120,6 +120,7 @@ add_library(roscpp
   src/libros/this_node.cpp
   src/libros/transport/kdbus-enum.c
   src/libros/transport/kdbus-util.c
+  src/libros/transport/kdbus_transport.cpp
   )
 
 add_dependencies(roscpp roscpp_gencpp rosgraph_msgs_gencpp std_msgs_gencpp)

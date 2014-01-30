@@ -59,17 +59,23 @@ VoidConstPtr MessageDeserializer::deserialize()
     return msg_;
   }
 
-  if (!serialized_message_.buf && serialized_message_.num_bytes > 0)
-  {
-    // If the buffer has been reset it means we tried to deserialize and failed
-    return VoidConstPtr();
-  }
-
   if (serialized_message_.memfd_message) {
     ROS_DEBUG("Got a kdbus message, skipping deserialization");
     // XXX: this puts the message in a shared_ptr, which will only work together with an disabled delete() operator
-    msg_ = VoidConstPtr(serialized_message_.memfd_message);
+//    msg_ = VoidConstPtr(serialized_message_.memfd_message); // this cannot work. memfd_message is a struct, isnt it? and we are casting it to void???
+//    return VoidConstPtr();
+
+    SubscriptionCallbackHelperDeserializeParams params;
+    params.memfd_message = serialized_message_.memfd_message;
+    params.connection_header = connection_header_;
+    msg_ = helper_->deserializeMemfd(params);
     return msg_;
+  }
+
+  if (!serialized_message_.buf)
+  {
+    // If the buffer has been reset it means we tried to deserialize and failed
+    return VoidConstPtr();
   }
 
   try

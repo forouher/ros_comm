@@ -40,9 +40,11 @@ class MemfdMessage
 
 private:
 
-  MemfdMessage() {};
 
 public:
+
+  MemfdMessage()
+    : fd_(-1), size_(0), buf_(NULL) {};
 
   MemfdMessage(int fd, void* buf, size_t size)
     : fd_(fd), size_(size), buf_(buf) {};
@@ -67,7 +69,10 @@ public:
   size_t size_;
   void* buf_;
 
+  typedef boost::shared_ptr<const MemfdMessage> Ptr;
+
 };
+
 
 }
 

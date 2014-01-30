@@ -189,6 +189,8 @@ private:
 
   void dropAllConnections();
 
+  std::string replaceStrChar(std::string str, char ch1, char ch2);
+
   void addPublisherLink(const PublisherLinkPtr& link);
 
   struct CallbackInfo

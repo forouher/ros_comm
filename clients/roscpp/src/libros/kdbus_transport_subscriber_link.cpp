@@ -35,6 +35,7 @@
 #include "ros/connection_manager.h"
 #include "ros/topic_manager.h"
 #include "ros/file_log.h"
+#include "ros/memfd_message.h"
 
 #include <boost/bind.hpp>
 
@@ -42,6 +43,7 @@ namespace ros
 {
 
 KdbusTransportSubscriberLink::KdbusTransportSubscriberLink()
+ : transport_("1000-ros")
 {
 
 }
@@ -68,7 +70,9 @@ bool KdbusTransportSubscriberLink::initialize(const std::string& topic, const st
 
   recv_name_ = client_name;
 
-  // TODO: open kdbus write connection
+  transport_.create_bus();
+  transport_.open_connection("");
+
   pt->addSubscriberLink(shared_from_this());
 
   return true;
@@ -76,8 +80,15 @@ bool KdbusTransportSubscriberLink::initialize(const std::string& topic, const st
 
 void KdbusTransportSubscriberLink::enqueueMessage(const SerializedMessage& m, bool ser, bool nocopy)
 {
-  // wird aufgerufen!
-  // TODO: send message to subscriber
+  // TODO: m.memfd_message empty
+//  ROS_DEBUG("m.num_bytes=%i, ser==%i, nocopy=%i", m.num_bytes, ser,nocopy);
+  if (!m.memfd_message) {
+//    ROS_ERROR("m.memfd_message is null!");
+    return;
+  }
+  // TODO: set m.type_info correctly
+
+  transport_.sendMessage(m.memfd_message, recv_name_);
 }
 
 std::string KdbusTransportSubscriberLink::getTransportType()

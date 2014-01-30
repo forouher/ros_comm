@@ -148,6 +148,8 @@ CallbackInterface::CallResult SubscriptionQueue::call()
   }
 
   VoidConstPtr msg = i.deserializer->deserialize();
+  fprintf(stderr, "SubscriptionQueue::call\n");
+  // listener subscriber goes through here
 
   // msg can be null here if deserialization failed
   if (msg)

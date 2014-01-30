@@ -59,6 +59,7 @@ namespace ros
 KdbusTransportPublisherLink::KdbusTransportPublisherLink(const SubscriptionPtr& parent, const std::string& xmlrpc_uri, const TransportHints& transport_hints)
 : PublisherLink(parent, xmlrpc_uri, transport_hints)
 , dropping_(false)
+, transport_("1000-ros")
 {
 }
 
@@ -71,21 +72,27 @@ bool KdbusTransportPublisherLink::initialize(std::string& endpoint_name)
   ROS_DEBUG("KdbusTransportPublisherLink::initialize(%s)", endpoint_name.c_str());
 
   // create kdbus connection, open bus
+  transport_.create_bus();
+  int sock_ = transport_.open_connection(endpoint_name);
 
   // we have to aquire name endpoint_name, messages will be send there
-  int sock_  = 0;
   ROS_DEBUG("Adding kdbus connection [%d] to pollset", sock_);
   PollManager::instance()->getPollSet().addSocket(sock_, boost::bind(&KdbusTransportPublisherLink::onMessage, this, _1));
-
+  PollManager::instance()->getPollSet().addEvents(sock_, POLLIN);
+  PollManager::instance()->getPollSet().addEvents(sock_, POLLOUT);
   return true;
 }
 
 void KdbusTransportPublisherLink::onMessage(int events)
 {
-  
+//  fprintf(stderr, "KdbusTransportPublisherLink::onMessage(%i)", events);
 // SerializedMessage(boost::shared_ptr<MemfdMessage>)
 
-//handleMessage(SerializedMessage(buffer, size), true, false);
+  boost::shared_ptr<MemfdMessage> m = transport_.receiveMessage();
+  ROS_ASSERT(m);
+
+  if (m)
+    handleMessage(SerializedMessage(m), true, false);
 }
 
 void KdbusTransportPublisherLink::drop()
@@ -107,7 +114,7 @@ void KdbusTransportPublisherLink::handleMessage(const SerializedMessage& m, bool
 
   if (parent)
   {
-    //stats_.drops_ += parent->handleMessage(m, ser, nocopy, getConnection()->getHeader().getValues(), shared_from_this());
+    stats_.drops_ += parent->handleMessage(m, ser, nocopy, boost::shared_ptr<M_string>(new M_string()), shared_from_this());
   }
 }
 

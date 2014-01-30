@@ -124,10 +124,10 @@ public:
     using namespace serialization;
 
     SerializedMessage m;
-    publish(topic, boost::bind(serializeMessage<M>, boost::ref(message)), m);
+    publish(topic, boost::bind(serializeMessage<M>, boost::ref(message)), boost::bind(shmemSerializeMessage<M>, boost::ref(message)), m);
   }
 
-  void publish(const std::string &_topic, const boost::function<SerializedMessage(void)>& serfunc, SerializedMessage& m);
+  void publish(const std::string &_topic, const boost::function<SerializedMessage(void)>& serfunc, const boost::function<SerializedMessage(void)>& shmemSerfunc, SerializedMessage& m);
 
   void incrementSequence(const std::string &_topic);
   bool isLatched(const std::string& topic);

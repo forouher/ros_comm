@@ -14,6 +14,7 @@
 #include <poll.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
+#include "ros/memfd_message.h"
 
 #include <boost/interprocess/managed_external_buffer.hpp>
 
@@ -81,8 +82,9 @@ public:
     KDBusMessage createMessage();
 
     int sendMessage(KDBusMessage& msg, const std::string& receiver);
+    int sendMessage(boost::shared_ptr<MemfdMessage> msg, const std::string& receiver);
 
-    KDBusMessage receiveMessage();
+    boost::shared_ptr<MemfdMessage> receiveMessage();
 
     // connection
     struct conn *conn;

@@ -31,6 +31,7 @@
 #include "subscriber_link.h"
 
 #include <boost/signals/connection.hpp>
+#include <ros/transport/kdbus_transport.h>
 
 namespace ros
 {
@@ -53,6 +54,7 @@ public:
 
 private:
   std::string recv_name_;
+  KDBusTransport transport_;
 };
 typedef boost::shared_ptr<KdbusTransportSubscriberLink> KdbusTransportSubscriberLinkPtr;
 

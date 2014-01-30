@@ -616,13 +616,18 @@ bool TopicManager::requestTopic(const string &topic,
 
     if (proto_name == string("KDBusROS"))
     {
-      if (proto.size() != 2 || proto[1].getType() != XmlRpcValue::TypeString)
+      if (proto.size() != 2 ||
+	  proto[1].getType() != XmlRpcValue::TypeString)
       {
       	ROSCPP_LOG_DEBUG("Invalid protocol parameters for KDBusROS");
         return false;
       }
 
       // TODO: compare hostnames, abort if not equal
+
+      // TODO: compare type_infos. abort if not equal (C++ gives no guaranties about this)
+      //std::string sub_type = proto[2];
+      //PublicationPtr p = lookupPublication(topic);
 
       XmlRpcValue kdbusros_params;
       kdbusros_params[0] = "KDBusROS";
@@ -727,7 +732,7 @@ bool TopicManager::requestTopic(const string &topic,
   return false;
 }
 
-void TopicManager::publish(const std::string& topic, const boost::function<SerializedMessage(void)>& serfunc, SerializedMessage& m)
+void TopicManager::publish(const std::string& topic, const boost::function<SerializedMessage(void)>& serfunc, const boost::function<SerializedMessage(void)>& shmemSerfunc, SerializedMessage& m)
 {
   boost::recursive_mutex::scoped_lock lock(advertised_topics_mutex_);
 
@@ -762,6 +767,13 @@ void TopicManager::publish(const std::string& topic, const boost::function<Seria
       m.type_info = 0;
     }
 
+    // XXX: do kdbus only if we have an kdbus connection
+    {
+      SerializedMessage m2 = shmemSerfunc();
+      m.memfd_message = m2.memfd_message;
+    }
+
+    // XXX: do serialize only if we have a serialize connection
     if (serialize || p->isLatching())
     {
       SerializedMessage m2 = serfunc();

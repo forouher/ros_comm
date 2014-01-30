@@ -28,6 +28,7 @@
 #ifndef ROSCPP_KDBUS_TRANSPORT_PUBLISHER_LINK_H
 #define ROSCPP_KDBUS_TRANSPORT_PUBLISHER_LINK_H
 
+#include <ros/transport/kdbus_transport.h>
 #include "common.h"
 #include "publisher_link.h"
 #include "connection.h"
@@ -70,6 +71,7 @@ private:
   void onMessage(int events);
 
   bool dropping_;
+  KDBusTransport transport_;
 
 };
 typedef boost::shared_ptr<KdbusTransportPublisherLink> KdbusTransportPublisherLinkPtr;

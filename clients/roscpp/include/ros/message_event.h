@@ -33,6 +33,7 @@
 #include "ros/time.h"
 #include <ros/assert.h>
 #include <ros/message_traits.h>
+#include <ros/memfd_message.h>
 
 #include <boost/type_traits/is_void.hpp>
 #include <boost/type_traits/is_base_of.hpp>
@@ -45,6 +46,24 @@
 
 namespace ros
 {
+
+template<typename M>
+struct DefaultMemfdMessageCreator
+{
+  boost::shared_ptr<M> operator()(MemfdMessage::Ptr m)
+  {
+    boost::shared_ptr<M> r = boost::make_shared<M>();
+    typedef M PureType;
+//    typedef typename ParameterAdapter<M>::Message PureType;
+    ROS_ASSERT(m);
+
+    boost::interprocess::managed_external_buffer segment(boost::interprocess::open_only, m->buf_, m->size_);
+    PureType *msg = segment.find<PureType>("DATA").first;
+    ROS_ASSERT(msg != NULL);
+    *r = *msg; // TODO: avoid this copy
+    return r;
+  }
+};
 
 template<typename M>
 struct DefaultMessageCreator
