@@ -80,13 +80,9 @@ bool KdbusTransportSubscriberLink::initialize(const std::string& topic, const st
 
 void KdbusTransportSubscriberLink::enqueueMessage(const SerializedMessage& m, bool ser, bool nocopy)
 {
-  // TODO: m.memfd_message empty
-//  ROS_DEBUG("m.num_bytes=%i, ser==%i, nocopy=%i", m.num_bytes, ser,nocopy);
-  if (!m.memfd_message) {
-//    ROS_ERROR("m.memfd_message is null!");
-    return;
-  }
-  // TODO: set m.type_info correctly
+  ROS_ASSERT(m.memfd_message);
+
+  // TODO: set m.type_info correctly ???
 
   transport_.sendMessage(m.memfd_message, recv_name_);
 }

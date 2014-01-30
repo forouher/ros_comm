@@ -82,9 +82,9 @@ public:
     KDBusMessage createMessage();
 
     int sendMessage(KDBusMessage& msg, const std::string& receiver);
-    int sendMessage(boost::shared_ptr<MemfdMessage> msg, const std::string& receiver);
+    int sendMessage(MemfdMessage::Ptr msg, const std::string& receiver);
 
-    boost::shared_ptr<MemfdMessage> receiveMessage();
+    MemfdMessage::Ptr receiveMessage();
 
     // connection
     struct conn *conn;

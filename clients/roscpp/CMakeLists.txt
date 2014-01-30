@@ -118,6 +118,7 @@ add_library(roscpp
   src/libros/poll_set.cpp
   src/libros/service.cpp
   src/libros/this_node.cpp
+  src/libros/memfd_message.cpp
   src/libros/transport/kdbus-enum.c
   src/libros/transport/kdbus-util.c
   src/libros/transport/kdbus_transport.cpp

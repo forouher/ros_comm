@@ -232,7 +232,7 @@ int KDBusTransport::sendMessage(KDBusMessage& msg, const std::string& receiver) 
 
 }
 
-int KDBusTransport::sendMessage(boost::shared_ptr<MemfdMessage> msg, const std::string& receiver) {
+int KDBusTransport::sendMessage(MemfdMessage::Ptr msg, const std::string& receiver) {
 
 	const char* name = receiver.c_str();
 
@@ -297,9 +297,9 @@ int KDBusTransport::sendMessage(boost::shared_ptr<MemfdMessage> msg, const std::
 
 }
 
-boost::shared_ptr<MemfdMessage> KDBusTransport::receiveMessage() {
+MemfdMessage::Ptr KDBusTransport::receiveMessage() {
 
-	boost::shared_ptr<MemfdMessage> m;
+	MemfdMessage::Ptr m;
 
 	uint64_t off;
 	struct kdbus_msg *msg;
@@ -338,7 +338,7 @@ boost::shared_ptr<MemfdMessage> KDBusTransport::receiveMessage() {
 			int ret = ioctl(item->memfd.fd, KDBUS_CMD_MEMFD_SIZE_GET, &size);
 			ROS_ASSERT(ret>=0); // maybe we wanna handle this
 
-			m = boost::shared_ptr<MemfdMessage>(new MemfdMessage(0,buf,1000000000));
+			m = MemfdMessage::Ptr(new MemfdMessage(item->memfd.fd,buf,1000000000));
 
 			break;
 		}

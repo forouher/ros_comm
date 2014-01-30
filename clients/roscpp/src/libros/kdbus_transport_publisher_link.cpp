@@ -85,10 +85,7 @@ bool KdbusTransportPublisherLink::initialize(std::string& endpoint_name)
 
 void KdbusTransportPublisherLink::onMessage(int events)
 {
-//  fprintf(stderr, "KdbusTransportPublisherLink::onMessage(%i)", events);
-// SerializedMessage(boost::shared_ptr<MemfdMessage>)
-
-  boost::shared_ptr<MemfdMessage> m = transport_.receiveMessage();
+  MemfdMessage::Ptr m = transport_.receiveMessage();
   ROS_ASSERT(m);
 
   if (m)
