@@ -25,43 +25,58 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_MEMFDMESSAGE_H
-#define ROSCPP_MEMFDMESSAGE_H
+#ifndef ROSCPP_MEMFD_SERIALIZE_H
+#define ROSCPP_MEMFD_SERIALIZE_H
 
 #include "forwards.h"
 #include "common.h"
 #include <sys/mman.h>
 
+#include <boost/utility/enable_if.hpp>
+#include <ros/memfd_message.h>
+#include <ros/serialized_message.h>
+#include <boost/interprocess/managed_external_buffer.hpp>
+#include "ros/parameter_adapter.h"
+#include <ros/boost_container.h>
+
 namespace ros
 {
 
-class MemfdMessage
+template<typename M>
+inline SerializedMessage shmemSerializeMessage(const M& message)
 {
+    return shmemSerializeMessageI(message);
+}
 
-private:
+template<typename M>
+inline SerializedMessage shmemSerializeMessageI(const M& message,
+					       typename boost::enable_if<ros::message_traits::IsShmemReady<M> >::type*_=0)
+{
+  SerializedMessage m;
 
-  MemfdMessage()
-    : fd_(-1), size_(0), buf_(NULL) {};
+  typedef typename ParameterAdapter<M>::Message PureType;
+  m.memfd_message = MemfdMessage::create(1000000000);
+  ROS_ASSERT(m.memfd_message);
+  ROS_ASSERT(m.memfd_message->size_==1000000000);
 
-public:
+  boost::interprocess::managed_external_buffer segment(boost::interprocess::create_only, m.memfd_message->buf_, m.memfd_message->size_);
+  typename PureType::allocator alloc (segment.get_segment_manager());
+  PureType* p = segment.construct<PureType>("DATA")(message,alloc);
+  p->__connection_header.reset();
+//  fprintf(stderr, "Created message with free space of %lu\n", segment.get_free_memory());
 
-  typedef boost::shared_ptr<const MemfdMessage> Ptr;
+  return m;
+}
 
-  MemfdMessage(int fd, void* buf, size_t size);
-  static MemfdMessage::Ptr create(size_t size);
-
-  ~MemfdMessage();
-
-
-  int fd_;
-  size_t size_;
-  void* buf_;
-
-  static int fd_control;
-
-};
+template<typename M>
+inline SerializedMessage shmemSerializeMessageI(const M& message,
+					       typename boost::disable_if<ros::message_traits::IsShmemReady<M> >::type*_=0)
+{
+  SerializedMessage m;
+  return m;
+}
 
 }
 
-#endif // ROSCPP_MEMFDMESSAGE_H
+#endif // ROSCPP_MEMFD_SERIALIZE_H
 

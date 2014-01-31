@@ -32,6 +32,7 @@
 #include "common.h"
 #include "ros/serialization.h"
 #include "rosout_appender.h"
+#include "ros/memfd_serialize.h"
 
 #include "XmlRpcValue.h"
 

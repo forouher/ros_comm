@@ -58,13 +58,13 @@ struct DefaultMemfdMessageCreator
     ROS_ASSERT(m->size_==1000000000);
 
     boost::interprocess::managed_external_buffer segment(boost::interprocess::open_only, m->buf_, m->size_);
-    fprintf(stderr, "Opened message with free space of %u\n", segment.get_free_memory());
+//    fprintf(stderr, "Opened message with free space of %lu\n", segment.get_free_memory());
     M* msg = segment.find<M>("DATA").first;
     ROS_ASSERT(msg != NULL);
 
     boost::shared_ptr<M> r = boost::make_shared<M>();
     *r = *msg; // TODO: avoid this copy
-    r->__connection_header.reset();
+    //r->__connection_header.reset(); // TODO: cannot do this here??
     return r;
   }
 };

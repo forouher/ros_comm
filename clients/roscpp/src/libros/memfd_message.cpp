@@ -49,7 +49,7 @@ MemfdMessage::MemfdMessage(int fd, void* buf, size_t size)
 
 MemfdMessage::Ptr MemfdMessage::create(size_t size)
 {
-  fprintf(stderr,"creating message size %i\n", size);
+//  fprintf(stderr,"creating message size %i\n", size);
   if (fd_control<0)
   {
     fd_control = open("/dev/kdbus/control", O_RDWR|O_CLOEXEC);
