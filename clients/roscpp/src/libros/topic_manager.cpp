@@ -625,6 +625,8 @@ bool TopicManager::requestTopic(const string &topic,
 
       // TODO: compare hostnames, abort if not equal
 
+      // TODO: check if publisher type is isShmemReady
+
       // TODO: compare type_infos. abort if not equal (C++ gives no guaranties about this)
       //std::string sub_type = proto[2];
       //PublicationPtr p = lookupPublication(topic);

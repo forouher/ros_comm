@@ -40,6 +40,7 @@ namespace ros
 {
 
 int MemfdMessage::fd_control = -1;
+size_t MemfdMessage::MAX_SIZE = 5000000; // 5mb
 
 MemfdMessage::MemfdMessage(int fd, void* buf, size_t size)
     : fd_(fd), size_(size), buf_(buf)
@@ -65,7 +66,7 @@ MemfdMessage::Ptr MemfdMessage::create(size_t size)
 
   void* buf = mmap(NULL, size,PROT_WRITE|PROT_READ,MAP_SHARED,memfd,0);
   ROS_ASSERT_MSG(buf != MAP_FAILED, "mmap failed on memfd=%i (%m)", memfd);
-  memset(buf,0xAA,10000000); // workaround
+//  memset(buf,0xAA,10000000); // workaround
 
   return MemfdMessage::Ptr(new MemfdMessage(memfd, (char*)buf, size));
 }

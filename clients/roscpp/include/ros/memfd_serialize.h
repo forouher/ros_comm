@@ -42,6 +42,17 @@
 namespace ros
 {
 
+inline void dump_memory2(void* d, size_t len)
+{   
+    char* data = (char*)d;
+    
+    size_t i;
+    printf("Data in [%p..%p): ",data,data+len);
+    for (i=0;i<len;i++)
+        printf("%02X ", ((unsigned char*)data)[i] );
+    printf("\n");
+}
+
 template<typename M>
 inline SerializedMessage shmemSerializeMessage(const M& message)
 {
@@ -55,15 +66,14 @@ inline SerializedMessage shmemSerializeMessageI(const M& message,
   SerializedMessage m;
 
   typedef typename ParameterAdapter<M>::Message PureType;
-  m.memfd_message = MemfdMessage::create(1000000000);
+  m.memfd_message = MemfdMessage::create(MemfdMessage::MAX_SIZE);
   ROS_ASSERT(m.memfd_message);
-  ROS_ASSERT(m.memfd_message->size_==1000000000);
+  ROS_ASSERT(m.memfd_message->size_==MemfdMessage::MAX_SIZE);
 
   boost::interprocess::managed_external_buffer segment(boost::interprocess::create_only, m.memfd_message->buf_, m.memfd_message->size_);
   typename PureType::allocator alloc (segment.get_segment_manager());
   PureType* p = segment.construct<PureType>("DATA")(message,alloc);
   p->__connection_header.reset();
-//  fprintf(stderr, "Created message with free space of %lu\n", segment.get_free_memory());
 
   return m;
 }

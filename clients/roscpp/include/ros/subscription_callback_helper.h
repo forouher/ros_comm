@@ -166,7 +166,7 @@ public:
     }
 
     // ?? my header is empty, anyways
-    assignSubscriptionConnectionHeader(msg.get(), params.connection_header);
+    //assignSubscriptionConnectionHeader(msg.get(), params.connection_header);
 
     return VoidConstPtr(msg);
   }

@@ -143,6 +143,7 @@ bool KDBusTransport::sendMessage(MemfdMessage::Ptr msg, const std::string& recei
 
 //	fprintf(stderr, "Sending msg to -->%s<--\n", name);
         munmap(msg->buf_,msg->size_);
+	msg->buf_ = NULL;
 
         int ret = ioctl(msg->fd_, KDBUS_CMD_MEMFD_SEAL_SET, true);
         if (ret < 0) {
@@ -184,7 +185,7 @@ bool KDBusTransport::sendMessage(MemfdMessage::Ptr msg, const std::string& recei
 	// next is our memfd
 	item->type = KDBUS_ITEM_PAYLOAD_MEMFD;
 	item->size = KDBUS_ITEM_HEADER_SIZE + sizeof(struct kdbus_memfd);
-	item->memfd.size = 1000000000;
+	item->memfd.size = MemfdMessage::MAX_SIZE;
 	item->memfd.fd = msg->fd_;
 	item = KDBUS_ITEM_NEXT(item);
 
@@ -194,7 +195,8 @@ bool KDBusTransport::sendMessage(MemfdMessage::Ptr msg, const std::string& recei
 		return false;
 	}
 
-	//close(msg.memfd);
+//	close(msg.memfd);
+	
 
 	free(kmsg);
 
@@ -241,13 +243,13 @@ MemfdMessage::Ptr KDBusTransport::receiveMessage() {
 		                break;
 		        }
 
-			buf = (char*)mmap(NULL, 1000000000, PROT_WRITE|PROT_READ, MAP_SHARED, item->memfd.fd, 0);
+			buf = (char*)mmap(NULL, MemfdMessage::MAX_SIZE, PROT_WRITE|PROT_READ, MAP_SHARED, item->memfd.fd, 0);
 			ROS_ASSERT(buf != MAP_FAILED);
 
 			ret = ioctl(item->memfd.fd, KDBUS_CMD_MEMFD_SIZE_GET, &size);
 			ROS_ASSERT(ret>=0); // maybe we wanna handle this
 
-			m = MemfdMessage::Ptr(new MemfdMessage(item->memfd.fd,buf,1000000000));
+			m = MemfdMessage::Ptr(new MemfdMessage(item->memfd.fd,buf,MemfdMessage::MAX_SIZE));
 
 			break;
 		}

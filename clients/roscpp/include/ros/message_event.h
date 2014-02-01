@@ -47,6 +47,17 @@
 namespace ros
 {
 
+inline void dump_memory(void* d, size_t len)
+{
+    char* data = (char*)d;
+
+    size_t i;
+    printf("Data in [%p..%p): ",data,data+len);
+    for (i=0;i<len;i++)
+        printf("%02X ", ((unsigned char*)data)[i] );
+    printf("\n");
+}
+
 template<typename M>
 struct DefaultMemfdMessageCreator
 {
@@ -55,16 +66,12 @@ struct DefaultMemfdMessageCreator
   boost::shared_ptr<M> operator()(MemfdMessage::Ptr m)
   {
     ROS_ASSERT(m);
-    ROS_ASSERT(m->size_==1000000000);
+    ROS_ASSERT(m->size_==MemfdMessage::MAX_SIZE);
 
     boost::interprocess::managed_external_buffer segment(boost::interprocess::open_only, m->buf_, m->size_);
-//    fprintf(stderr, "Opened message with free space of %lu\n", segment.get_free_memory());
     M* msg = segment.find<M>("DATA").first;
     ROS_ASSERT(msg != NULL);
-
-    boost::shared_ptr<M> r = boost::make_shared<M>();
-    *r = *msg; // TODO: avoid this copy
-    //r->__connection_header.reset(); // TODO: cannot do this here??
+    boost::shared_ptr<M> r = boost::make_shared<M>(*msg);
     return r;
   }
 };

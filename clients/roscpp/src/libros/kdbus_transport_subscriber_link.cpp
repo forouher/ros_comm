@@ -69,6 +69,7 @@ bool KdbusTransportSubscriberLink::initialize(const std::string& topic, const st
   }
 
   recv_name_ = client_name;
+  topic_ = topic;
 
   transport_.create_bus();
   transport_.open_connection("");
@@ -80,7 +81,9 @@ bool KdbusTransportSubscriberLink::initialize(const std::string& topic, const st
 
 void KdbusTransportSubscriberLink::enqueueMessage(const SerializedMessage& m, bool ser, bool nocopy)
 {
-  ROS_ASSERT(m.memfd_message);
+  ROS_ASSERT_MSG(m.memfd_message, "bad message on topic '%s' to '%s'", topic_.c_str(), recv_name_.c_str());
+
+  ROS_ASSERT_MSG(m.memfd_message->buf_, "buf_ in message is NULL");
 
   // TODO: set m.type_info correctly ???
 

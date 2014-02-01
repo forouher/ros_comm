@@ -45,7 +45,7 @@ private:
 
 public:
 
-  typedef boost::shared_ptr<const MemfdMessage> Ptr;
+  typedef boost::shared_ptr<MemfdMessage> Ptr;
 
   MemfdMessage(int fd, void* buf, size_t size);
   static MemfdMessage::Ptr create(size_t size);
@@ -58,6 +58,7 @@ public:
   void* buf_;
 
   static int fd_control;
+  static size_t MAX_SIZE;
 
 };
 

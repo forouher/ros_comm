@@ -55,6 +55,7 @@ public:
 private:
   std::string recv_name_;
   KDBusTransport transport_;
+  std::string topic_;
 };
 typedef boost::shared_ptr<KdbusTransportSubscriberLink> KdbusTransportSubscriberLinkPtr;
 
