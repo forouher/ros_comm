@@ -58,6 +58,14 @@ inline void dump_memory(void* d, size_t len)
     printf("\n");
 }
 
+
+template<typename T>
+static void Deleter( T* ptr)
+{
+    if (ptr->mem_)
+        ptr->mem_.reset();
+}
+
 template<typename M>
 struct DefaultMemfdMessageCreator
 {
@@ -71,7 +79,8 @@ struct DefaultMemfdMessageCreator
     boost::interprocess::managed_external_buffer segment(boost::interprocess::open_only, m->buf_, m->size_);
     M* msg = segment.find<M>("DATA").first;
     ROS_ASSERT(msg != NULL);
-    boost::shared_ptr<M> r = boost::make_shared<M>(*msg);
+    msg->mem_ = m;
+    boost::shared_ptr<M> r = boost::shared_ptr<M>(msg, &Deleter<M>);
     return r;
   }
 };

@@ -752,16 +752,22 @@ void TopicManager::publish(const std::string& topic, const boost::function<Seria
     // do a no-copy publish.
     bool nocopy = false;
     bool serialize = false;
+    bool shmem = false;
+
+    p->getPublishTypes(serialize, nocopy, shmem, typeid(void));
 
     // We can only do a no-copy publish if a shared_ptr to the message is provided, and we have type information for it
     if (m.type_info && m.message)
     {
-      p->getPublishTypes(serialize, nocopy, *m.type_info);
+      p->getPublishTypes(serialize, nocopy, shmem, *m.type_info);
     }
     else
     {
       serialize = true;
+      nocopy = false;
     }
+
+//    fprintf(stderr,"s=%i, n=%i,sm=%i\n", serialize, nocopy, shmem);
 
     if (!nocopy)
     {
@@ -769,13 +775,12 @@ void TopicManager::publish(const std::string& topic, const boost::function<Seria
       m.type_info = 0;
     }
 
-    // XXX: do kdbus only if we have an kdbus connection
-    {
+
+    if (shmem) {
       SerializedMessage m2 = shmemSerfunc();
       m.memfd_message = m2.memfd_message;
     }
 
-    // XXX: do serialize only if we have a serialize connection
     if (serialize || p->isLatching())
     {
       SerializedMessage m2 = serfunc();

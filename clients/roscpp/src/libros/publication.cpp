@@ -374,7 +374,7 @@ uint32_t Publication::getNumSubscribers()
   return (uint32_t)subscriber_links_.size();
 }
 
-void Publication::getPublishTypes(bool& serialize, bool& nocopy, const std::type_info& ti)
+void Publication::getPublishTypes(bool& serialize, bool& nocopy, bool& shmem, const std::type_info& ti)
 {
   boost::mutex::scoped_lock lock(subscriber_links_mutex_);
   V_SubscriberLink::const_iterator it = subscriber_links_.begin();
@@ -384,11 +384,13 @@ void Publication::getPublishTypes(bool& serialize, bool& nocopy, const std::type
     const SubscriberLinkPtr& sub = *it;
     bool s = false;
     bool n = false;
-    sub->getPublishTypes(s, n, ti);
+    bool sm = false;
+    sub->getPublishTypes(s, n, sm, ti);
     serialize = serialize || s;
     nocopy = nocopy || n;
+    shmem = shmem || sm;
 
-    if (serialize && nocopy)
+    if (serialize && nocopy && shmem)
     {
       break;
     }
@@ -403,7 +405,7 @@ bool Publication::hasSubscribers()
 
 void Publication::publish(SerializedMessage& m)
 {
-  if (m.message)
+  if (m.message || m.memfd_message)
   {
     boost::mutex::scoped_lock lock(subscriber_links_mutex_);
     V_SubscriberLink::const_iterator it = subscriber_links_.begin();
@@ -411,7 +413,7 @@ void Publication::publish(SerializedMessage& m)
     for (; it != end; ++it)
     {
       const SubscriberLinkPtr& sub = *it;
-      if (sub->isIntraprocess())
+      if (sub->isIntraprocess() || sub->isShmem())
       {
         sub->enqueueMessage(m, false, true);
       }

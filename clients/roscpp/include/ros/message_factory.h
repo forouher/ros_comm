@@ -1,5 +1,6 @@
+
 /*
- * Copyright (C) 2008, Morgan Quigley and Willow Garage, Inc.
+ * Copyright (C) 2010, Willow Garage, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -25,43 +26,50 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_KDBUS_TRANSPORT_SUBSCRIBER_LINK_H
-#define ROSCPP_KDBUS_TRANSPORT_SUBSCRIBER_LINK_H
-#include "common.h"
-#include "subscriber_link.h"
+#ifndef ROSCPP_MESSAGE_FACTORY_H
+#define ROSCPP_MESSAGE_FACTORY_H
 
-#include <boost/signals/connection.hpp>
-#include <ros/transport/kdbus_transport.h>
+#include "ros/forwards.h"
+#include "ros/time.h"
+#include <ros/assert.h>
+#include <ros/message_traits.h>
+#include <ros/memfd_message.h>
+
+#include <boost/type_traits/is_void.hpp>
+#include <boost/type_traits/is_base_of.hpp>
+#include <boost/type_traits/is_const.hpp>
+#include <boost/type_traits/add_const.hpp>
+#include <boost/type_traits/remove_const.hpp>
+#include <boost/utility/enable_if.hpp>
+#include <boost/function.hpp>
+#include <boost/make_shared.hpp>
 
 namespace ros
 {
 
-/**
- * \brief SubscriberLink handles broadcasting messages to a single subscriber on a single topic
- */
-class ROSCPP_DECL KdbusTransportSubscriberLink : public SubscriberLink
+template<typename T>
+static void Deleter2( T* ptr)
 {
-public:
-  KdbusTransportSubscriberLink();
-  virtual ~KdbusTransportSubscriberLink();
+    if (ptr->mem_)
+	ptr->mem_.reset();
+}
 
-  //
-  bool initialize(const std::string& topic, const std::string& client_name);
+template<typename M>
+static typename M::Ptr createMessage()
+{
+  MemfdMessage::Ptr m = MemfdMessage::create(MemfdMessage::MAX_SIZE);
+  ROS_ASSERT(m);
+  ROS_ASSERT(m->size_==MemfdMessage::MAX_SIZE);
 
-  virtual void enqueueMessage(const SerializedMessage& m, bool ser, bool nocopy);
-  virtual void drop();
-  virtual std::string getTransportType();
+  boost::interprocess::managed_external_buffer segment(boost::interprocess::create_only, m->buf_, m->size_);
+  typename M::allocator alloc (segment.get_segment_manager());
+  M* msg = segment.construct<M>("DATA")(alloc);
+  msg->mem_ = m;
 
-  virtual bool isShmem() { return true; }
-  virtual void getPublishTypes(bool& ser, bool& nocopy, bool& shmem, const std::type_info& ti) { ser = false; nocopy = false; shmem = true; }
+  boost::shared_ptr<M> r = boost::shared_ptr<M>(msg, &Deleter2<M>);
+  return r;
+}
 
-private:
-  std::string recv_name_;
-  KDBusTransport transport_;
-  std::string topic_;
-};
-typedef boost::shared_ptr<KdbusTransportSubscriberLink> KdbusTransportSubscriberLinkPtr;
+}
 
-} // namespace ros
-
-#endif // ROSCPP_KDBUS_TRANSPORT_SUBSCRIBER_LINK_H
+#endif // ROSCPP_MESSAGE_EVENT_H

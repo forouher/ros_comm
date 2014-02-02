@@ -54,7 +54,7 @@ public:
   virtual void drop();
   virtual std::string getTransportType();
   virtual bool isIntraprocess() { return true; }
-  virtual void getPublishTypes(bool& ser, bool& nocopy, const std::type_info& ti);
+  virtual void getPublishTypes(bool& ser, bool& nocopy, bool& shmem, const std::type_info& ti);
 
 private:
   IntraProcessPublisherLinkPtr subscriber_;
