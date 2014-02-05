@@ -64,6 +64,8 @@ public:
 
   static bool uses_old_API_;
 
+  boost::shared_ptr<ros::MemfdMessage> mem_;
+
   // Constructor and destructor
   ShapeShifter();
   virtual ~ShapeShifter();
