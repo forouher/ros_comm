@@ -279,7 +279,7 @@ bool del_topic_cb(topic_tools::MuxDelete::Request& req,
 
 int main(int argc, char **argv)
 {
-  vector<string> args;
+  ros::V_string args;
   ros::removeROSArgs(argc, (const char**)argv, args);
 
   if (args.size() < 3)
@@ -292,7 +292,7 @@ int main(int argc, char **argv)
     return 1;
   ros::init(argc, argv, topic_name + string("_mux"),
             ros::init_options::AnonymousName);
-  vector<string> topics;
+  ros::V_string topics;
   for (unsigned int i = 2; i < args.size(); i++)
     topics.push_back(args[i]);
   ros::NodeHandle n;
