@@ -183,7 +183,8 @@ bool Publication::enqueueMessage(const SerializedMessage& m)
       i != subscriber_links_.end(); ++i)
   {
     const SubscriberLinkPtr& sub_link = (*i);
-    sub_link->enqueueMessage(m, true, false);
+/*    if (!sub_link->isShmem()) */
+      sub_link->enqueueMessage(m, true, false);
   }
 
   if (latch_)
@@ -407,7 +408,7 @@ bool Publication::hasSubscribers()
 
 void Publication::publish(SerializedMessage& m)
 {
-  if (m.message)
+  if (m.message || m.memfd_message)
   {
     boost::mutex::scoped_lock lock(subscriber_links_mutex_);
     V_SubscriberLink::const_iterator it = subscriber_links_.begin();
@@ -415,10 +416,18 @@ void Publication::publish(SerializedMessage& m)
     for (; it != end; ++it)
     {
       const SubscriberLinkPtr& sub = *it;
-      if (sub->isIntraprocess())
+      if (m.message && sub->isIntraprocess())
       {
         sub->enqueueMessage(m, false, true);
       }
+
+/*    // This looks like a good idea, but it is unreliable.
+      // maybe there are threading issues?
+      if (m.memfd_message && sub->isShmem())
+      {
+        sub->enqueueMessage(m, false, true);
+      }
+*/
     }
 
     m.message.reset();
