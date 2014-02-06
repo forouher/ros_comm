@@ -754,7 +754,12 @@ void TopicManager::publish(const std::string& topic, const boost::function<Seria
     bool serialize = false;
     bool shmem = false;
 
+    // this is ugly. we have to check if the links support shmem. but this method is not callable
+    // in all situations. so we have to call it twice. better would be to make it safe and just call
+    // it always.
     p->getPublishTypes(serialize, nocopy, shmem, typeid(void));
+    serialize = false;
+    nocopy = false;
 
     // We can only do a no-copy publish if a shared_ptr to the message is provided, and we have type information for it
     if (m.type_info && m.message)
@@ -766,8 +771,7 @@ void TopicManager::publish(const std::string& topic, const boost::function<Seria
       serialize = true;
       nocopy = false;
     }
-
-//    fprintf(stderr,"s=%i, n=%i,sm=%i\n", serialize, nocopy, shmem);
+//    fprintf(stderr,"C s=%i, n=%i,sm=%i\n", serialize, nocopy, shmem);
 
     if (!nocopy)
     {
