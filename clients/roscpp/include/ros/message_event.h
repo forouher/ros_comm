@@ -66,6 +66,23 @@ static void Deleter( T* ptr)
         ptr->mem_.reset();
 }
 
+// TODO: this is too late. we should never create a Shmem Message in the first place!
+template<typename M>
+boost::shared_ptr<M> makeSharedPtrFromMessage(M* msg, MemfdMessage::Ptr m,
+                                              typename boost::enable_if<ros::message_traits::IsShmemReady<M> >::type*_=0)
+{
+    msg->mem_ = m;
+    return boost::shared_ptr<M>(msg, &Deleter<M>);
+}
+
+template<typename M>
+boost::shared_ptr<M> makeSharedPtrFromMessage(M* msg, MemfdMessage::Ptr m,
+                                              typename boost::disable_if<ros::message_traits::IsShmemReady<M> >::type*_=0)
+{
+    ROS_ASSERT(false);
+    return boost::shared_ptr<M>(msg);
+}
+
 template<typename M>
 struct DefaultMemfdMessageCreator
 {
@@ -79,9 +96,7 @@ struct DefaultMemfdMessageCreator
     boost::interprocess::managed_external_buffer segment(boost::interprocess::open_only, m->buf_, m->size_);
     M* msg = segment.find<M>("DATA").first;
     ROS_ASSERT(msg != NULL);
-    msg->mem_ = m;
-    boost::shared_ptr<M> r = boost::shared_ptr<M>(msg, &Deleter<M>);
-    return r;
+    return  makeSharedPtrFromMessage<M>(msg, m);
   }
 };
 

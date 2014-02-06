@@ -141,7 +141,6 @@ bool KDBusTransport::sendMessage(MemfdMessage::Ptr msg, const std::string& recei
 
 	const char* name = receiver.c_str();
 
-//	fprintf(stderr, "Sending msg to -->%s<--\n", name);
         munmap(msg->buf_,msg->size_);
 	msg->buf_ = NULL;
 
@@ -192,11 +191,9 @@ bool KDBusTransport::sendMessage(MemfdMessage::Ptr msg, const std::string& recei
 	ret = ioctl(conn->fd, KDBUS_CMD_MSG_SEND, kmsg);
 	if (ret < 0) {
 		fprintf(stderr, "error sending message: %d err %d (%m)\n", ret, errno);
+//		msg->buf_ = mmap(NULL, msg->size_, PROT_READ, 0, msg->fd_, 0);
 		return false;
 	}
-
-//	close(msg.memfd);
-	
 
 	free(kmsg);
 
@@ -240,11 +237,11 @@ MemfdMessage::Ptr KDBusTransport::receiveMessage() {
 		        int ret = ioctl(item->memfd.fd, KDBUS_CMD_MEMFD_SEAL_SET, false);
 		        if (ret < 0) {
 		                fprintf(stderr, "memfd unsealing failed: %m\n");
-		                break;
+//		                break;
 		        }
 
-			buf = (char*)mmap(NULL, MemfdMessage::MAX_SIZE, PROT_WRITE|PROT_READ, MAP_SHARED, item->memfd.fd, 0);
-			ROS_ASSERT(buf != MAP_FAILED);
+			buf = (char*)mmap(NULL, MemfdMessage::MAX_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, item->memfd.fd, 0);
+			ROS_ASSERT_MSG(buf != MAP_FAILED, "error: %i (%m)", errno);
 
 			ret = ioctl(item->memfd.fd, KDBUS_CMD_MEMFD_SIZE_GET, &size);
 			ROS_ASSERT(ret>=0); // maybe we wanna handle this

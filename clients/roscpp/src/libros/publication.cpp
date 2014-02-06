@@ -32,6 +32,7 @@
 #include "ros/single_subscriber_publisher.h"
 #include "ros/serialization.h"
 #include <std_msgs/Header.h>
+#include <ros/memfd_message.h>
 
 namespace ros
 {
@@ -87,7 +88,7 @@ Publication::Publication(const std::string &name,
   max_queue_(max_queue),
   seq_(0),
   dropped_(false),
-  latch_(latch),
+  latch_(false),
   has_header_(has_header),
   intraprocess_subscriber_count_(0)
 {
@@ -162,10 +163,10 @@ bool Publication::enqueueMessage(const SerializedMessage& m)
     return false;
   }
 
-  ROS_ASSERT(m.buf);
+  ROS_ASSERT(m.buf || m.memfd_message);
 
   uint32_t seq = incrementSequence();
-  if (has_header_)
+  if (has_header_ && m.buf)
   {
     // If we have a header, we know it's immediately after the message length
     // Deserialize it, write the sequence, and then serialize it again.
@@ -187,6 +188,7 @@ bool Publication::enqueueMessage(const SerializedMessage& m)
 
   if (latch_)
   {
+    ROS_DEBUG("Storing message for latching");
     last_message_ = m;
   }
 
@@ -211,7 +213,7 @@ void Publication::addSubscriberLink(const SubscriberLinkPtr& sub_link)
     }
   }
 
-  if (latch_ && last_message_.buf)
+  if (latch_ && last_message_.buf && last_message_.memfd_message->buf_)
   {
     sub_link->enqueueMessage(last_message_, true, true);
   }
@@ -405,7 +407,7 @@ bool Publication::hasSubscribers()
 
 void Publication::publish(SerializedMessage& m)
 {
-  if (m.message || m.memfd_message)
+  if (m.message)
   {
     boost::mutex::scoped_lock lock(subscriber_links_mutex_);
     V_SubscriberLink::const_iterator it = subscriber_links_.begin();
@@ -413,7 +415,7 @@ void Publication::publish(SerializedMessage& m)
     for (; it != end; ++it)
     {
       const SubscriberLinkPtr& sub = *it;
-      if (sub->isIntraprocess() || sub->isShmem())
+      if (sub->isIntraprocess())
       {
         sub->enqueueMessage(m, false, true);
       }
@@ -422,7 +424,7 @@ void Publication::publish(SerializedMessage& m)
     m.message.reset();
   }
 
-  if (m.buf)
+  if (m.buf || m.memfd_message)
   {
     boost::mutex::scoped_lock lock(publish_queue_mutex_);
     publish_queue_.push_back(m);

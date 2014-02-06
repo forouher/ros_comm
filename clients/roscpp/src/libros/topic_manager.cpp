@@ -775,10 +775,12 @@ void TopicManager::publish(const std::string& topic, const boost::function<Seria
       m.type_info = 0;
     }
 
-
-    if (shmem) {
+    // TODO: latching will not work yet, as messages cannot be sent twice
+    if (shmem || p->isLatching()) {
       SerializedMessage m2 = shmemSerfunc();
       m.memfd_message = m2.memfd_message;
+      ROS_ASSERT(m.memfd_message);
+      ROS_ASSERT(m.memfd_message->buf_);
     }
 
     if (serialize || p->isLatching())

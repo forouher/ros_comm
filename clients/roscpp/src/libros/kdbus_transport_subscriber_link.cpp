@@ -83,8 +83,8 @@ void KdbusTransportSubscriberLink::enqueueMessage(const SerializedMessage& m, bo
 {
   ROS_ASSERT_MSG(m.memfd_message, "bad message on topic '%s' to '%s'", topic_.c_str(), recv_name_.c_str());
 
-  ROS_ASSERT_MSG(m.memfd_message->buf_, "buf_ in message is NULL");
-
+//  fprintf(stderr, "KdbusTransportSubscriberLink::enqueueMessage with fd=%i\n", m.memfd_message->fd_);
+  ROS_ASSERT_MSG(m.memfd_message->buf_, "buf_ in message is NULL, size_=%lu", m.memfd_message->size_);
   // TODO: set m.type_info correctly ???
 
   // check for error. if "no such process", then kill connection.

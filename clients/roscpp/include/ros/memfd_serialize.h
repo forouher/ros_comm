@@ -66,9 +66,11 @@ inline SerializedMessage shmemSerializeMessageI(const M& message,
   SerializedMessage m;
   typedef typename ParameterAdapter<M>::Message PureType;
 
+//  fprintf(stderr, "shmemSerializeMessageI()\n");
 //  if (message.mem_) {
     m.memfd_message = MemfdMessage::create(MemfdMessage::MAX_SIZE);
     ROS_ASSERT(m.memfd_message);
+    ROS_ASSERT(m.memfd_message->buf_);
     ROS_ASSERT(m.memfd_message->size_==MemfdMessage::MAX_SIZE);
   
     boost::interprocess::managed_external_buffer segment(boost::interprocess::create_only, m.memfd_message->buf_, m.memfd_message->size_);
@@ -101,6 +103,8 @@ template<typename M>
 inline SerializedMessage shmemSerializeMessageI(const M& message,
 					       typename boost::disable_if<ros::message_traits::IsShmemReady<M> >::type*_=0)
 {
+  fprintf(stderr, "booom!\n");
+  ROS_ASSERT(false);
   SerializedMessage m;
   return m;
 }
