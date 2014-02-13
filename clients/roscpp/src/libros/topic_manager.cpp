@@ -799,7 +799,7 @@ void TopicManager::publish(const std::string& topic, const boost::function<Seria
 
     // If we're not doing a serialized publish we don't need to signal the pollset.  The write()
     // call inside signal() is actually relatively expensive when doing a nocopy publish.
-    if (serialize)
+    if (serialize || shmem)
     {
       poll_manager_->getPollSet().signal();
     }
