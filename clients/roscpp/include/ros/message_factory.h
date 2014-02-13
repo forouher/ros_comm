@@ -43,32 +43,94 @@
 #include <boost/utility/enable_if.hpp>
 #include <boost/function.hpp>
 #include <boost/make_shared.hpp>
+#include <boost/interprocess/managed_shared_memory.hpp>
+#include <boost/uuid/uuid.hpp>            // uuid class
+#include <boost/uuid/uuid_generators.hpp> // generators
+#include <boost/uuid/uuid_io.hpp>
+#include <boost/interprocess/interprocess_fwd.hpp>
+#include <boost/interprocess/sync/interprocess_mutex.hpp>
+#include <boost/container/deque.hpp>
+#include <boost/interprocess/sync/interprocess_condition.hpp>
 
 namespace ros
 {
-
-template<typename T>
-static void Deleter2( T* ptr)
-{
-    if (ptr->mem_)
-	ptr->mem_.reset();
-}
+  typedef boost::interprocess::managed_shared_memory::segment_manager segment_manager_type;
+  typedef boost::interprocess::ros_allocator< void, ros::segment_manager_type> void_allocator_type;
+  typedef boost::interprocess::deleter< void, ros::segment_manager_type>  void_deleter_type;
+  typedef boost::interprocess::shared_ptr< void, ros::void_allocator_type, void_deleter_type > VoidIPtr;
 
 template<typename M>
-static typename M::Ptr createMessage()
+class ShmemDeque
 {
-  MemfdMessage::Ptr m = MemfdMessage::create(MemfdMessage::MAX_SIZE);
-  ROS_ASSERT(m);
-  ROS_ASSERT(m->size_==MemfdMessage::MAX_SIZE);
+  public:
 
-  boost::interprocess::managed_external_buffer segment(boost::interprocess::create_only, m->buf_, m->size_);
-  typename M::allocator alloc (segment.get_segment_manager());
-  M* msg = segment.construct<M>("DATA")(alloc);
-  msg->mem_ = m;
+  typedef boost::interprocess::deleter< ShmemDeque, ros::segment_manager_type>  deleter_type;
+  typedef boost::interprocess::shared_ptr< ShmemDeque, ros::void_allocator_type, deleter_type > IPtr;
 
-  boost::shared_ptr<M> r = boost::shared_ptr<M>(msg, &Deleter2<M>);
-  return r;
-}
+  boost::interprocess::interprocess_mutex mutex_;
+  typedef typename ros::void_allocator_type::rebind<typename M::IPtr>::other allocator;
+  boost::container::deque<typename M::IPtr, allocator> store_;
+
+//  boost::interprocess::interprocess_condition signal_;
+
+  inline explicit ShmemDeque(const allocator& alloc)
+    : store_(alloc) { };
+
+  void add(const typename M::IPtr msg)
+  {
+    boost::interprocess::scoped_lock<boost::interprocess::interprocess_mutex> lock(mutex_);
+    store_.push_front(msg);
+    
+  };
+
+  typename M::IPtr remove()
+  {
+    boost::interprocess::scoped_lock<boost::interprocess::interprocess_mutex> lock(mutex_);
+    typename M::IPtr msg = store_.back();
+    store_.pop_back();
+    return msg;
+  };
+
+};
+
+class MessageFactory
+{
+
+private:
+    static boost::shared_ptr<boost::interprocess::managed_shared_memory> segment;
+public:
+
+template<typename M>
+static typename ros::ShmemDeque<M>::IPtr createDeque()
+{
+  if (!segment)
+    segment = boost::make_shared<boost::interprocess::managed_shared_memory>(boost::interprocess::open_only, "ros_test");
+
+  boost::uuids::uuid uuid = boost::uuids::random_generator()();
+
+  typename ros::ShmemDeque<M>::allocator alloc (segment->get_segment_manager());
+  ros::ShmemDeque<M>* deque = segment->construct<ros::ShmemDeque<M> >(boost::uuids::to_string(uuid).c_str())(alloc);
+
+  typename ros::ShmemDeque<M>::IPtr dp(deque, alloc, typename ros::ShmemDeque<M>::deleter_type(segment->get_segment_manager()));
+  return dp;
+};
+
+template<typename M>
+static typename M::IPtr createMessage()
+{
+  if (!segment)
+    segment = boost::make_shared<boost::interprocess::managed_shared_memory>(boost::interprocess::open_only, "ros_test");
+
+  boost::uuids::uuid uuid = boost::uuids::random_generator()();
+
+  typename M::allocator alloc (segment->get_segment_manager());
+  M* msg = segment->construct<M>(boost::uuids::to_string(uuid).c_str())(alloc);
+
+  typename M::IPtr p = typename M::IPtr(msg, alloc, typename M::deleter_type(segment->get_segment_manager()));
+  return p;
+};
+
+};
 
 }
 

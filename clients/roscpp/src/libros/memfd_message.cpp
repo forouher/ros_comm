@@ -35,12 +35,14 @@ extern "C"
 }
 
 #include <boost/interprocess/managed_external_buffer.hpp>
-
+#include "ros/message_factory.h"
 namespace ros
 {
 
 int MemfdMessage::fd_control = -1;
 size_t MemfdMessage::MAX_SIZE = 5000000; // 5mb
+
+boost::shared_ptr<boost::interprocess::managed_shared_memory> MessageFactory::segment;
 
 MemfdMessage::MemfdMessage(int fd, void* buf, size_t size)
     : fd_(fd), size_(size), buf_(buf)
