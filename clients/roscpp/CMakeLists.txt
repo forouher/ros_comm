@@ -102,6 +102,8 @@ add_library(roscpp
   src/libros/transport/transport_tcp.cpp
   src/libros/subscriber_link.cpp
   src/libros/service_client_link.cpp
+  src/libros/shmem_publisher_link.cpp
+  src/libros/shmem_subscriber_link.cpp
   src/libros/kdbus_transport_publisher_link.cpp
   src/libros/kdbus_transport_subscriber_link.cpp
   src/libros/transport_publisher_link.cpp

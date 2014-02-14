@@ -60,6 +60,9 @@
 #include "ros/file_log.h"
 #include "ros/transport_hints.h"
 #include "ros/subscription_callback_helper.h"
+#include <boost/uuid/uuid.hpp>            // uuid class
+#include <boost/uuid/uuid_generators.hpp> // generators
+#include <boost/uuid/uuid_io.hpp>
 
 #include <boost/make_shared.hpp>
 
@@ -352,6 +355,7 @@ bool Subscription::negotiateConnection(const std::string& xmlrpc_uri)
 {
   XmlRpcValue tcpros_array, protos_array, params;
   XmlRpcValue udpros_array, kdbusros_array;
+  XmlRpcValue shmemros_array;
   TransportUDPPtr udp_transport;
   int protos = 0;
   V_string transports = transport_hints_.getTransports();
@@ -403,6 +407,14 @@ bool Subscription::negotiateConnection(const std::string& xmlrpc_uri)
       kdbusros_array[1] = my_endpoint_name;
       protos_array[protos++] = kdbusros_array;
       ROS_DEBUG("Adding KDBus as proto offer");
+    }
+    else if (*it == "Shmem")
+    {
+      boost::uuids::uuid uuid = boost::uuids::random_generator()();
+      shmemros_array[0] = std::string("ShmemROS");
+      shmemros_array[1] = boost::uuids::to_string(uuid); // UUID of Deque
+      protos_array[protos++] = shmemros_array;
+      ROS_DEBUG("Adding Shmem as proto offer");
     }
     else
     {
@@ -548,6 +560,21 @@ void Subscription::pendingConnectionDone(const PendingConnectionPtr& conn, XmlRp
     {
     	ROSCPP_LOG_DEBUG("Failed to connect to publisher of topic [%s] at [%s:%d]", name_.c_str(), pub_host.c_str(), pub_port);
     }
+  }
+  else if (proto_name == "ShmemROS")
+  {
+    ROSCPP_LOG_DEBUG("Connecting via shmemros to topic [%s]", name_.c_str());
+/*
+    KdbusTransportPublisherLinkPtr pub_link(new KdbusTransportPublisherLink(shared_from_this(), xmlrpc_uri, transport_hints_));
+
+    std::string my_endpoint_name = "m"+getName() + "hohoho" + this_node::getName();
+    my_endpoint_name = replaceStrChar(my_endpoint_name, '/', '.');
+    pub_link->initialize(my_endpoint_name);
+
+    boost::mutex::scoped_lock lock(publisher_links_mutex_);
+    addPublisherLink(pub_link);
+*/ // TODO
+    ROSCPP_LOG_DEBUG("Connected to publisher of topic [%s]", name_.c_str());
   }
   else if (proto_name == "KDBusROS")
   {

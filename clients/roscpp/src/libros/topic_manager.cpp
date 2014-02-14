@@ -614,7 +614,37 @@ bool TopicManager::requestTopic(const string &topic,
 
     string proto_name = proto[0];
 
-    if (proto_name == string("KDBusROS"))
+    if (proto_name == string("ShmemROS"))
+    {
+      if (proto.size() != 2 ||
+	  proto[1].getType() != XmlRpcValue::TypeString)
+      {
+      	ROSCPP_LOG_DEBUG("Invalid protocol parameters for ShmemROS");
+        return false;
+      }
+
+      // TODO: compare hostnames, abort if not equal
+
+      // TODO: check if publisher type is isShmemReady
+
+      // TODO: compare type_infos. abort if not equal (C++ gives no guaranties about this)
+      //std::string sub_type = proto[2];
+      //PublicationPtr p = lookupPublication(topic);
+
+      XmlRpcValue shmemros_params;
+      shmemros_params[0] = "ShmemROS";
+      ret[0] = int(1);
+      ret[1] = string();
+      ret[2] = shmemros_params;
+
+      std::string deque_uuid = proto[1];
+
+      // add this connection endpoint name to the list of ids we send messages to.
+      //connection_manager_->addKdbusConnection(topic, deque_uuid); // TODO
+
+      return true;
+    }
+    else if (proto_name == string("KDBusROS"))
     {
       if (proto.size() != 2 ||
 	  proto[1].getType() != XmlRpcValue::TypeString)
