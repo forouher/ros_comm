@@ -75,8 +75,11 @@ std::string ShmemSubscriberLink::getTransportType()
 
 void ShmemSubscriberLink::initialize(const std::string& deque_uuid)
 {
-  //ROS_DEBUG("Creating shmem deque with UUID %s", deque_uuid.c_str());
-//  deque_ = MessageFactory::createDeque<sensor_msgs::PointCloud3>(deque_uuid);
+  ROS_DEBUG("Creating shmem deque with UUID %s", deque_uuid.c_str());
+  deque_ = MessageFactory::createDeque<sensor_msgs::PointCloud3>(deque_uuid);
+  ROS_DEBUG("Created shmem deque with UUID %s", deque_uuid.c_str());
+  ros::ShmemDeque<sensor_msgs::PointCloud3>::Ptr footest = MessageFactory::findDeque<sensor_msgs::PointCloud3>(deque_uuid);
+  ROS_DEBUG("Test-found shmem deque with UUID %s", deque_uuid.c_str());
 }
 
 void ShmemSubscriberLink::drop()

@@ -63,6 +63,7 @@ void ShmemPublisherLink::initialize(const std::string& deque_uuid)
 {
   ROS_DEBUG("Trying to open shmem deque with uuid %s", deque_uuid.c_str());
 //  deque_ = MessageFactory::findDeque<sensor_msgs::PointCloud3>(deque_uuid);
+  ROS_DEBUG("Opened shmem deque with uuid %s", deque_uuid.c_str());
   thread_ = boost::thread(&ShmemPublisherLink::threadRunner, this);
 }
 

@@ -51,6 +51,7 @@
 #include <boost/interprocess/sync/interprocess_mutex.hpp>
 #include <boost/container/deque.hpp>
 #include <boost/interprocess/sync/interprocess_condition.hpp>
+#include <boost/interprocess/smart_ptr/shared_ptr.hpp>
 
 namespace ros
 {
@@ -65,7 +66,9 @@ class ShmemDeque
   public:
 
   typedef boost::interprocess::deleter< ShmemDeque, ros::segment_manager_type>  deleter_type;
-  typedef boost::interprocess::shared_ptr< ShmemDeque, ros::void_allocator_type, deleter_type > IPtr;
+  typedef ShmemDeque* Ptr;
+//  typedef boost::interprocess::shared_ptr< ShmemDeque, ros::void_allocator_type, deleter_type > IPtr;
+//  typedef typename boost::interprocess::managed_shared_ptr< ShmemDeque, boost::interprocess::managed_shared_memory>::type IPtr;
 
   boost::interprocess::interprocess_mutex mutex_;
   typedef typename ros::void_allocator_type::rebind<typename M::IPtr>::other allocator;
@@ -101,30 +104,36 @@ private:
 public:
 
 template<typename M>
-static typename ros::ShmemDeque<M>::IPtr findDeque(const std::string& uuids)
+static typename ros::ShmemDeque<M>::Ptr findDeque(const std::string& uuids)
 {
-  if (!segment)
+  if (!segment) {
+    ROS_DEBUG("Opening shmem segment");
     segment = boost::make_shared<boost::interprocess::managed_shared_memory>(boost::interprocess::open_only, "ros_test");
+  }
+
+  ROS_ASSERT(segment);
 
   typename ros::ShmemDeque<M>::allocator alloc (segment->get_segment_manager());
-  ros::ShmemDeque<M>* deque = segment->find<ros::ShmemDeque<M> >(uuids.c_str()).first;
-  ROS_ASSERT(deque);
-
-  typename ros::ShmemDeque<M>::IPtr dp(deque, alloc, typename ros::ShmemDeque<M>::deleter_type(segment->get_segment_manager()));
-  return dp;
+  typename ros::ShmemDeque<M>::Ptr dp1 = segment->find<ros::ShmemDeque<M> >(uuids.c_str()).first;
+  ROS_ASSERT(dp1);
+  return dp1;
 };
 
 template<typename M>
-static typename ros::ShmemDeque<M>::IPtr createDeque(const std::string& uuids)
+static typename ros::ShmemDeque<M>::Ptr createDeque(const std::string& uuids)
 {
-  if (!segment)
+  if (!segment) {
+    ROS_DEBUG("Opening shmem segment");
     segment = boost::make_shared<boost::interprocess::managed_shared_memory>(boost::interprocess::open_only, "ros_test");
+  }
+
+  ROS_ASSERT(segment);
 
   typename ros::ShmemDeque<M>::allocator alloc (segment->get_segment_manager());
-  ros::ShmemDeque<M>* deque = segment->construct<ros::ShmemDeque<M> >(uuids.c_str())(alloc);
+  typename ros::ShmemDeque<M>::Ptr sh_ptr = segment->construct<ros::ShmemDeque<M> >(uuids.c_str())(alloc);
+  ROS_ASSERT(sh_ptr);
 
-  typename ros::ShmemDeque<M>::IPtr dp(deque, alloc, typename ros::ShmemDeque<M>::deleter_type(segment->get_segment_manager()));
-  return dp;
+  return sh_ptr;
 };
 
 template<typename M>
