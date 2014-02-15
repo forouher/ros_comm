@@ -59,8 +59,11 @@ void ShmemSubscriberLink::enqueueMessage(const SerializedMessage& m, bool ser, b
 {
   boost::recursive_mutex::scoped_lock lock(drop_mutex_);
 
-//  boost::interprocess::scoped_lock<boost::interprocess::interprocess_mutex> lock2(deque_->mutex_);
-//  deque_->signal_.notify_one();
+  boost::interprocess::scoped_lock<boost::interprocess::interprocess_mutex> lock2(deque_->mutex_);
+
+  // deque_->add() // TODO
+
+  deque_->signal_.notify_one();
 
   if (dropped_)
   {
@@ -73,13 +76,28 @@ std::string ShmemSubscriberLink::getTransportType()
   return std::string("ShmemTransport");
 }
 
-void ShmemSubscriberLink::initialize(const std::string& deque_uuid)
+void ShmemSubscriberLink::initialize(const std::string& topic, const std::string& deque_uuid)
 {
+  PublicationPtr pt = TopicManager::instance()->lookupPublication(topic);
+  if (!pt)
+  {
+    std::string msg = std::string("received a connection for a nonexistent topic [") +
+                    topic + std::string("].");
+  
+    ROSCPP_LOG_DEBUG("%s", msg.c_str());
+  
+    return;
+  }
+
+  topic_ = topic;
+
   ROS_DEBUG("Creating shmem deque with UUID %s", deque_uuid.c_str());
   deque_ = MessageFactory::createDeque<sensor_msgs::PointCloud3>(deque_uuid);
-  ROS_DEBUG("Created shmem deque with UUID %s", deque_uuid.c_str());
-  ros::ShmemDeque<sensor_msgs::PointCloud3>::Ptr footest = MessageFactory::findDeque<sensor_msgs::PointCloud3>(deque_uuid);
-  ROS_DEBUG("Test-found shmem deque with UUID %s", deque_uuid.c_str());
+
+  pt->addSubscriberLink(shared_from_this());
+
+  return;
+
 }
 
 void ShmemSubscriberLink::drop()
@@ -102,7 +120,7 @@ void ShmemSubscriberLink::getPublishTypes(bool& ser, bool& nocopy, bool& shmem, 
   {
     return;
   }
-  shmem = false;
+  shmem = true;
 //  subscriber_->getPublishTypes(ser, nocopy, ti);
 }
 

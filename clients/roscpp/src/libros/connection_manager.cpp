@@ -217,7 +217,7 @@ void ConnectionManager::addKdbusConnection(const std::string& topic, const std::
 void ConnectionManager::addShmemConnection(const std::string& topic, const std::string& deque_uuid)
 {
   ShmemSubscriberLinkPtr sub_link(new ShmemSubscriberLink());
-  sub_link->initialize(deque_uuid);
+  sub_link->initialize(topic, deque_uuid);
 }
 
 bool ConnectionManager::onConnectionHeaderReceived(const ConnectionPtr& conn, const Header& header)

@@ -47,12 +47,12 @@ public:
   virtual ~ShmemSubscriberLink();
 
   bool isLatching();
-  void initialize(const std::string& deque_uuid);
+  void initialize(const std::string& topic, const std::string& deque_uuid);
 
   virtual void enqueueMessage(const SerializedMessage& m, bool ser, bool nocopy);
   virtual void drop();
   virtual std::string getTransportType();
-  virtual bool isIntraprocess() { return true; }
+  virtual bool isIntraprocess() { return false; }
   virtual void getPublishTypes(bool& ser, bool& nocopy, bool& shmem, const std::type_info& ti);
 
 private:

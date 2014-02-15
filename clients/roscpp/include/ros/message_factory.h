@@ -81,7 +81,13 @@ class ShmemDeque
 
   void add(const typename M::IPtr msg)
   {
-    boost::interprocess::scoped_lock<boost::interprocess::interprocess_mutex> lock(mutex_);
+//    boost::interprocess::scoped_lock<boost::interprocess::interprocess_mutex> lock(mutex_);
+
+    if (store_.size()>10) {
+      ROS_DEBUG("deque is full, dropping msg");
+      return;
+    }
+
     store_.push_front(msg);
     
   };

@@ -62,18 +62,18 @@ ShmemPublisherLink::~ShmemPublisherLink()
 void ShmemPublisherLink::initialize(const std::string& deque_uuid)
 {
   ROS_DEBUG("Trying to open shmem deque with uuid %s", deque_uuid.c_str());
-//  deque_ = MessageFactory::findDeque<sensor_msgs::PointCloud3>(deque_uuid);
+  deque_ = MessageFactory::findDeque<sensor_msgs::PointCloud3>(deque_uuid);
   ROS_DEBUG("Opened shmem deque with uuid %s", deque_uuid.c_str());
   thread_ = boost::thread(&ShmemPublisherLink::threadRunner, this);
 }
 
 void ShmemPublisherLink::threadRunner()
 {
-//  while (true) {
-//    boost::interprocess::scoped_lock<boost::interprocess::interprocess_mutex> lock(deque_->mutex_);
-//    deque_->signal_.wait(lock);
-    ROS_DEBUG("ShmemPublisherLink::threadRunner() has been awakened!");
-//  }
+  while (true) {
+    boost::interprocess::scoped_lock<boost::interprocess::interprocess_mutex> lock(deque_->mutex_);
+    deque_->signal_.wait(lock);
+    fprintf(stderr,"ShmemPublisherLink::threadRunner() has been awakened!\n");
+  }
 
 }
 
