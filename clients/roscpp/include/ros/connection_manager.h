@@ -69,6 +69,7 @@ public:
 
   void udprosIncomingConnection(const TransportUDPPtr& transport, Header& header);
   void addKdbusConnection(const std::string& topic, const std::string& client_con_name);
+  void addShmemConnection(const std::string& topic, const std::string& deque_uuid);
 
   void start();
   void shutdown();

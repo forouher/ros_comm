@@ -41,12 +41,9 @@
 namespace ros
 {
 
-ShmemSubscriberLink::ShmemSubscriberLink(const PublicationPtr& parent)
+ShmemSubscriberLink::ShmemSubscriberLink()
 : dropped_(false)
 {
-  ROS_ASSERT(parent);
-  parent_ = parent;
-  topic_ = parent->getName();
 }
 
 ShmemSubscriberLink::~ShmemSubscriberLink()
@@ -55,17 +52,16 @@ ShmemSubscriberLink::~ShmemSubscriberLink()
 
 bool ShmemSubscriberLink::isLatching()
 {
-  if (PublicationPtr parent = parent_.lock())
-  {
-    return parent->isLatching();
-  }
-
   return false;
 }
 
 void ShmemSubscriberLink::enqueueMessage(const SerializedMessage& m, bool ser, bool nocopy)
 {
   boost::recursive_mutex::scoped_lock lock(drop_mutex_);
+
+//  boost::interprocess::scoped_lock<boost::interprocess::interprocess_mutex> lock2(deque_->mutex_);
+//  deque_->signal_.notify_one();
+
   if (dropped_)
   {
     return;
@@ -74,7 +70,13 @@ void ShmemSubscriberLink::enqueueMessage(const SerializedMessage& m, bool ser, b
 
 std::string ShmemSubscriberLink::getTransportType()
 {
-  return std::string("INTRAPROCESS");
+  return std::string("ShmemTransport");
+}
+
+void ShmemSubscriberLink::initialize(const std::string& deque_uuid)
+{
+  //ROS_DEBUG("Creating shmem deque with UUID %s", deque_uuid.c_str());
+//  deque_ = MessageFactory::createDeque<sensor_msgs::PointCloud3>(deque_uuid);
 }
 
 void ShmemSubscriberLink::drop()
@@ -87,13 +89,6 @@ void ShmemSubscriberLink::drop()
     }
 
     dropped_ = true;
-  }
-
-  if (PublicationPtr parent = parent_.lock())
-  {
-    ROSCPP_LOG_DEBUG("Connection to local subscriber on topic [%s] dropped", topic_.c_str());
-
-    parent->removeSubscriberLink(shared_from_this());
   }
 }
 

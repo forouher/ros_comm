@@ -71,7 +71,7 @@ class ShmemDeque
   typedef typename ros::void_allocator_type::rebind<typename M::IPtr>::other allocator;
   boost::container::deque<typename M::IPtr, allocator> store_;
 
-//  boost::interprocess::interprocess_condition signal_;
+  boost::interprocess::interprocess_condition signal_;
 
   inline explicit ShmemDeque(const allocator& alloc)
     : store_(alloc) { };
@@ -101,15 +101,27 @@ private:
 public:
 
 template<typename M>
-static typename ros::ShmemDeque<M>::IPtr createDeque()
+static typename ros::ShmemDeque<M>::IPtr findDeque(const std::string& uuids)
 {
   if (!segment)
     segment = boost::make_shared<boost::interprocess::managed_shared_memory>(boost::interprocess::open_only, "ros_test");
 
-  boost::uuids::uuid uuid = boost::uuids::random_generator()();
+  typename ros::ShmemDeque<M>::allocator alloc (segment->get_segment_manager());
+  ros::ShmemDeque<M>* deque = segment->find<ros::ShmemDeque<M> >(uuids.c_str()).first;
+  ROS_ASSERT(deque);
+
+  typename ros::ShmemDeque<M>::IPtr dp(deque, alloc, typename ros::ShmemDeque<M>::deleter_type(segment->get_segment_manager()));
+  return dp;
+};
+
+template<typename M>
+static typename ros::ShmemDeque<M>::IPtr createDeque(const std::string& uuids)
+{
+  if (!segment)
+    segment = boost::make_shared<boost::interprocess::managed_shared_memory>(boost::interprocess::open_only, "ros_test");
 
   typename ros::ShmemDeque<M>::allocator alloc (segment->get_segment_manager());
-  ros::ShmemDeque<M>* deque = segment->construct<ros::ShmemDeque<M> >(boost::uuids::to_string(uuid).c_str())(alloc);
+  ros::ShmemDeque<M>* deque = segment->construct<ros::ShmemDeque<M> >(uuids.c_str())(alloc);
 
   typename ros::ShmemDeque<M>::IPtr dp(deque, alloc, typename ros::ShmemDeque<M>::deleter_type(segment->get_segment_manager()));
   return dp;

@@ -30,6 +30,7 @@
 #include "ros/connection.h"
 #include "ros/transport_subscriber_link.h"
 #include "ros/kdbus_transport_subscriber_link.h"
+#include "ros/shmem_subscriber_link.h"
 #include "ros/service_client_link.h"
 #include "ros/transport/transport_tcp.h"
 #include "ros/transport/transport_udp.h"
@@ -211,6 +212,12 @@ void ConnectionManager::addKdbusConnection(const std::string& topic, const std::
   // TODO
   KdbusTransportSubscriberLinkPtr sub_link(new KdbusTransportSubscriberLink());
   sub_link->initialize(topic, client_con_name);
+}
+
+void ConnectionManager::addShmemConnection(const std::string& topic, const std::string& deque_uuid)
+{
+  ShmemSubscriberLinkPtr sub_link(new ShmemSubscriberLink());
+  sub_link->initialize(deque_uuid);
 }
 
 bool ConnectionManager::onConnectionHeaderReceived(const ConnectionPtr& conn, const Header& header)

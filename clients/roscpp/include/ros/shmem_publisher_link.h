@@ -32,6 +32,9 @@
 #include "common.h"
 
 #include <boost/thread/recursive_mutex.hpp>
+#include <boost/thread/thread.hpp>
+#include <sensor_msgs/PointCloud3.h>
+#include <ros/message_factory.h>
 
 namespace ros
 {
@@ -49,8 +52,12 @@ public:
   ShmemPublisherLink(const SubscriptionPtr& parent, const std::string& xmlrpc_uri, const TransportHints& transport_hints);
   virtual ~ShmemPublisherLink();
 
+  void initialize(const std::string& deque_uuid);
+
   virtual std::string getTransportType();
   virtual void drop();
+
+  virtual void threadRunner();
 
   /**
    * \brief Handles handing off a received message to the subscription, where it will be deserialized and called back
@@ -62,6 +69,9 @@ public:
 private:
   bool dropped_;
   boost::recursive_mutex drop_mutex_;
+  boost::thread thread_;
+//  ros::ShmemDeque<sensor_msgs::PointCloud3>::IPtr deque_;
+
 };
 typedef boost::shared_ptr<ShmemPublisherLink> ShmemPublisherLinkPtr;
 

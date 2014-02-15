@@ -631,16 +631,18 @@ bool TopicManager::requestTopic(const string &topic,
       //std::string sub_type = proto[2];
       //PublicationPtr p = lookupPublication(topic);
 
+      std::string deque_uuid = proto[1];
+
       XmlRpcValue shmemros_params;
       shmemros_params[0] = "ShmemROS";
+      shmemros_params[1] = proto[1]; // mirror back uuid of deque
       ret[0] = int(1);
       ret[1] = string();
       ret[2] = shmemros_params;
 
-      std::string deque_uuid = proto[1];
 
       // add this connection endpoint name to the list of ids we send messages to.
-      //connection_manager_->addKdbusConnection(topic, deque_uuid); // TODO
+      connection_manager_->addShmemConnection(topic, deque_uuid);
 
       return true;
     }

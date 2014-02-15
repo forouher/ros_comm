@@ -42,6 +42,7 @@
 #include "ros/file_log.h"
 
 #include <boost/bind.hpp>
+#include <ros/message_factory.h>
 
 #include <sstream>
 
@@ -58,25 +59,22 @@ ShmemPublisherLink::~ShmemPublisherLink()
 {
 }
 
-/*
-void ShmemPublisherLink::setPublisher(const ShmemSubscriberLinkPtr& publisher)
+void ShmemPublisherLink::initialize(const std::string& deque_uuid)
 {
-  publisher_ = publisher;
-
-  SubscriptionPtr parent = parent_.lock();
-  ROS_ASSERT(parent);
-
-  Header header;
-  M_stringPtr values = header.getValues();
-  (*values)["callerid"] = this_node::getName();
-  (*values)["topic"] = parent->getName();
-  (*values)["type"] = publisher->getDataType();
-  (*values)["md5sum"] = publisher->getMD5Sum();
-  (*values)["message_definition"] = publisher->getMessageDefinition();
-  (*values)["latching"] = publisher->isLatching() ? "1" : "0";
-  setHeader(header);
+  ROS_DEBUG("Trying to open shmem deque with uuid %s", deque_uuid.c_str());
+//  deque_ = MessageFactory::findDeque<sensor_msgs::PointCloud3>(deque_uuid);
+  thread_ = boost::thread(&ShmemPublisherLink::threadRunner, this);
 }
-*/
+
+void ShmemPublisherLink::threadRunner()
+{
+//  while (true) {
+//    boost::interprocess::scoped_lock<boost::interprocess::interprocess_mutex> lock(deque_->mutex_);
+//    deque_->signal_.wait(lock);
+    ROS_DEBUG("ShmemPublisherLink::threadRunner() has been awakened!");
+//  }
+
+}
 
 void ShmemPublisherLink::drop()
 {
@@ -119,7 +117,7 @@ void ShmemPublisherLink::handleMessage(const SerializedMessage& m, bool ser, boo
 
 std::string ShmemPublisherLink::getTransportType()
 {
-  return std::string("INTRAPROCESS");
+  return std::string("ShmemTransport");
 }
 
 void ShmemPublisherLink::getPublishTypes(bool& ser, bool& nocopy, const std::type_info& ti)

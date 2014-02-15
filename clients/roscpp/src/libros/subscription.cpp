@@ -50,6 +50,7 @@
 #include "ros/transport/transport_tcp.h"
 #include "ros/transport/transport_udp.h"
 #include "ros/transport/transport_kdbus.h"
+#include "ros/shmem_publisher_link.h"
 #include "ros/callback_queue_interface.h"
 #include "ros/this_node.h"
 #include "ros/network.h"
@@ -563,17 +564,22 @@ void Subscription::pendingConnectionDone(const PendingConnectionPtr& conn, XmlRp
   }
   else if (proto_name == "ShmemROS")
   {
+    if (proto.size() != 2 ||
+        proto[1].getType() != XmlRpcValue::TypeString)
+    {
+    	ROSCPP_LOG_DEBUG("publisher implements ShmemROS, but the " \
+                "parameters aren't string");
+      return;
+    }
     ROSCPP_LOG_DEBUG("Connecting via shmemros to topic [%s]", name_.c_str());
-/*
-    KdbusTransportPublisherLinkPtr pub_link(new KdbusTransportPublisherLink(shared_from_this(), xmlrpc_uri, transport_hints_));
+    const std::string deque_uuid = proto[1];
 
-    std::string my_endpoint_name = "m"+getName() + "hohoho" + this_node::getName();
-    my_endpoint_name = replaceStrChar(my_endpoint_name, '/', '.');
-    pub_link->initialize(my_endpoint_name);
+    ShmemPublisherLinkPtr pub_link(new ShmemPublisherLink(shared_from_this(), xmlrpc_uri, transport_hints_));
+    pub_link->initialize(deque_uuid);
 
     boost::mutex::scoped_lock lock(publisher_links_mutex_);
     addPublisherLink(pub_link);
-*/ // TODO
+
     ROSCPP_LOG_DEBUG("Connected to publisher of topic [%s]", name_.c_str());
   }
   else if (proto_name == "KDBusROS")
