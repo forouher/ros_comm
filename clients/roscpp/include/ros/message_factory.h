@@ -90,6 +90,11 @@ class ShmemDeque
   inline explicit ShmemDeque(const allocator& alloc)
     : store_(alloc) { };
 
+  bool isEmpty()
+  {
+    return store_.empty();
+  }
+
   void add(const boost::uuids::uuid& uuid)
   {
 //    boost::interprocess::scoped_lock<boost::interprocess::interprocess_mutex> lock(mutex_);
@@ -192,7 +197,7 @@ static void destroyMessage(const M* msg)
 
   ROS_ASSERT(segment);
 
-  segment->destroy<M>(msg);
+  segment->destroy_ptr<M>(msg);
 };
 
 
