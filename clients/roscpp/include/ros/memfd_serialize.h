@@ -63,39 +63,10 @@ template<typename M>
 inline SerializedMessage shmemSerializeMessageI(const M& message,
 					       typename boost::enable_if<ros::message_traits::IsShmemReady<M> >::type*_=0)
 {
+
+  fprintf(stderr, "booom!\n");
+  ROS_ASSERT(false);
   SerializedMessage m;
-  typedef typename ParameterAdapter<M>::Message PureType;
-
-//  fprintf(stderr, "shmemSerializeMessageI()\n");
-//  if (message.mem_) {
-    m.memfd_message = MemfdMessage::create(MemfdMessage::MAX_SIZE);
-    ROS_ASSERT(m.memfd_message);
-    ROS_ASSERT(m.memfd_message->buf_);
-    ROS_ASSERT(m.memfd_message->size_==MemfdMessage::MAX_SIZE);
-  
-    boost::interprocess::managed_external_buffer segment(boost::interprocess::create_only, m.memfd_message->buf_, m.memfd_message->size_);
-    typename PureType::allocator alloc (segment.get_segment_manager());
-    PureType* p = segment.construct<PureType>("DATA")(message,alloc);
-    p->__connection_header.reset();
-    p->mem_.reset();
-//  } else {
-/*    fprintf(stderr, "using optimized shmemSerializeMessageI\n");
-
-    const boost::shared_ptr<MemfdMessage> backup = message.mem_;
-    message.mem_.reset();
-
-    m.memfd_message = MemfdMessage::create(MemfdMessage::MAX_SIZE);
-    ROS_ASSERT(m.memfd_message);
-    ROS_ASSERT(m.memfd_message->size_==MemfdMessage::MAX_SIZE);
-    memcpy(m.memfd_message->buf_, message.mem_->buf_, message.mem_->size_);
-
-    boost::interprocess::managed_external_buffer segment(boost::interprocess::open_only, m.memfd_message->buf_, m.memfd_message->size_);
-    PureType* p = segment.find<PureType>("DATA").first;
-    p->__connection_header.reset();
-
-    message.mem_ = backup;
-*/
-//  }
   return m;
 }
 

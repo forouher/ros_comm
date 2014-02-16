@@ -75,7 +75,9 @@ void ShmemPublisherLink::threadRunner()
     fprintf(stderr,"ShmemPublisherLink::threadRunner() has been awakened!\n");
     boost::uuids::uuid uuid = deque_->remove();
     fprintf(stderr, "removed uuid %s from deque\n", boost::uuids::to_string(uuid).c_str());
-    sensor_msgs::PointCloud3* msg = MessageFactory::findMessage<sensor_msgs::PointCloud3>(uuid);
+    SerializedMessage msg;
+    msg.uuid = uuid;
+    handleMessage(msg, false, true);
   }
 
 }
@@ -108,14 +110,11 @@ void ShmemPublisherLink::handleMessage(const SerializedMessage& m, bool ser, boo
     return;
   }
 
-  stats_.bytes_received_ += m.num_bytes;
-  stats_.messages_received_++;
-
   SubscriptionPtr parent = parent_.lock();
 
   if (parent)
   {
-    stats_.drops_ += parent->handleMessage(m, ser, nocopy, header_.getValues(), shared_from_this());
+    parent->handleMessage(m, ser, nocopy, header_.getValues(), shared_from_this());
   }
 }
 

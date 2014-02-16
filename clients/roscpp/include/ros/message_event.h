@@ -43,6 +43,7 @@
 #include <boost/utility/enable_if.hpp>
 #include <boost/function.hpp>
 #include <boost/make_shared.hpp>
+#include <ros/message_factory.h>
 
 namespace ros
 {
@@ -64,6 +65,11 @@ static void Deleter( T* ptr)
 {
     if (ptr->mem_)
         ptr->mem_.reset();
+}
+
+template<typename T>
+static void DeleterShmem( T* ptr)
+{
 }
 
 // TODO: this is too late. we should never create a Shmem Message in the first place!
@@ -97,6 +103,17 @@ struct DefaultMemfdMessageCreator
     M* msg = segment.find<M>("DATA").first;
     ROS_ASSERT(msg != NULL);
     return  makeSharedPtrFromMessage<M>(msg, m);
+  }
+};
+
+template<typename M>
+struct DefaultShmemMessageCreator
+{
+  boost::shared_ptr<M> operator()(const boost::uuids::uuid uuid)
+  {
+    M* msg = MessageFactory::findMessage<M>(uuid);
+    ROS_ASSERT(msg != NULL);
+    return boost::shared_ptr<M>(msg, &DeleterShmem<M>);
   }
 };
 

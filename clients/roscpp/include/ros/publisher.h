@@ -121,6 +121,38 @@ namespace ros
     }
 
     /**
+     * \brief Publish a message on the topic associated with this Publisher.
+     */
+    template <typename M>
+      void publishShmem(const M& message) const
+    {
+      using namespace serialization;
+      namespace mt = ros::message_traits;
+
+      if (!impl_)
+        {
+          ROS_ASSERT_MSG(false, "Call to publish() on an invalid Publisher");
+          return;
+        }
+
+      if (!impl_->isValid())
+        {
+          ROS_ASSERT_MSG(false, "Call to publish() on an invalid Publisher (topic [%s])", impl_->topic_.c_str());
+          return;
+        }
+
+      ROS_ASSERT_MSG(impl_->md5sum_ == "*" || std::string(mt::md5sum<M>(message)) == "*" || impl_->md5sum_ == mt::md5sum<M>(message),
+                     "Trying to publish message of type [%s/%s] on a publisher with type [%s/%s]",
+                     mt::datatype<M>(message), mt::md5sum<M>(message),
+                     impl_->datatype_.c_str(), impl_->md5sum_.c_str());
+
+      SerializedMessage m;
+      m.uuid = message.uuid;
+
+      publish(boost::bind(serializeMessage<M>, boost::ref(message)), boost::bind(shmemSerializeMessage<M>, boost::ref(message)), m);
+    }
+
+    /**
      * \brief Shutdown the advertisement associated with this Publisher
      *
      * This method usually does not need to be explicitly called, as automatic shutdown happens when

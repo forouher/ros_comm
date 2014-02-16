@@ -59,6 +59,14 @@ VoidConstPtr MessageDeserializer::deserialize()
     return msg_;
   }
 
+  if (!serialized_message_.uuid.is_nil()) {
+    fprintf(stderr, "retrieving msg from shmem\n");
+    SubscriptionCallbackHelperDeserializeParams params;
+    params.uuid = serialized_message_.uuid;
+    msg_ = helper_->deserializeShmem(params);
+    return msg_;
+  }
+
   if (serialized_message_.memfd_message) {
     SubscriptionCallbackHelperDeserializeParams params;
     params.memfd_message = serialized_message_.memfd_message;

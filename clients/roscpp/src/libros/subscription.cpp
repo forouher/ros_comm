@@ -685,7 +685,7 @@ uint32_t Subscription::handleMessage(const SerializedMessage& m, bool ser, bool 
 
     const std::type_info* ti = &info->helper_->getTypeInfo();
 
-    if (m.memfd_message || (nocopy && m.type_info && *ti == *m.type_info) || (ser && (!m.type_info || *ti != *m.type_info)))
+    if (!m.uuid.is_nil() || m.memfd_message || (nocopy && m.type_info && *ti == *m.type_info) || (ser && (!m.type_info || *ti != *m.type_info)))
     {
       MessageDeserializerPtr deserializer;
 

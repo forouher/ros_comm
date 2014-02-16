@@ -162,6 +162,7 @@ static M* createMessage()
   typename M::allocator alloc (segment->get_segment_manager());
   M* msg = segment->construct<M>(boost::uuids::to_string(uuid).c_str())(alloc);
   msg->uuid = uuid;
+  fprintf(stderr, "Created message with UUID %s\n", boost::uuids::to_string(msg->uuid).c_str());
 //  typename M::Ptr p = typename M::Ptr(msg, &DummyDeleter<M>);
   return msg;
 };

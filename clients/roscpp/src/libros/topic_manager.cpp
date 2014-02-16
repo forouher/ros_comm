@@ -41,6 +41,8 @@
 #include "ros/init.h"
 #include "ros/file_log.h"
 #include "ros/subscribe_options.h"
+#include <boost/uuid/uuid_generators.hpp> // generators
+#include <boost/uuid/uuid_io.hpp>
 
 #include "XmlRpc.h"
 
@@ -811,8 +813,12 @@ void TopicManager::publish(const std::string& topic, const boost::function<Seria
       m.type_info = 0;
     }
 
+    if (!m.uuid.is_nil()) {
+        fprintf(stderr,"got UUID msg: %s\n", boost::uuids::to_string(m.uuid).c_str());
+    }
+
     // TODO: latching will not work yet, as messages cannot be sent twice
-    if (shmem || p->isLatching()) {
+    if ((shmem || p->isLatching()) && m.uuid.is_nil()) {
       SerializedMessage m2 = shmemSerfunc();
       m.memfd_message = m2.memfd_message;
       ROS_ASSERT(m.memfd_message);
