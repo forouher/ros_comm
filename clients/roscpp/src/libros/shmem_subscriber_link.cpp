@@ -35,6 +35,7 @@
 #include "ros/connection_manager.h"
 #include "ros/topic_manager.h"
 #include "ros/file_log.h"
+#include <sensor_msgs/PointCloud3.h>
 
 #include <boost/bind.hpp>
 
@@ -61,7 +62,8 @@ void ShmemSubscriberLink::enqueueMessage(const SerializedMessage& m, bool ser, b
 
   boost::interprocess::scoped_lock<boost::interprocess::interprocess_mutex> lock2(deque_->mutex_);
 
-  // deque_->add() // TODO
+  sensor_msgs::PointCloud3::IPtr foo = ros::MessageFactory::createMessage<sensor_msgs::PointCloud3>();
+  deque_->add(ShmemDequeVoid::VoidIPtr(foo));
 
   deque_->signal_.notify_one();
 
@@ -92,8 +94,7 @@ void ShmemSubscriberLink::initialize(const std::string& topic, const std::string
   topic_ = topic;
 
   ROS_DEBUG("Creating shmem deque with UUID %s", deque_uuid.c_str());
-  deque_ = MessageFactory::createDeque<sensor_msgs::PointCloud3>(deque_uuid);
-
+  deque_ = MessageFactory::createDeque(deque_uuid);
   pt->addSubscriberLink(shared_from_this());
 
   return;

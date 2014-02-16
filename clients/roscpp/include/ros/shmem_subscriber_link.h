@@ -58,7 +58,7 @@ public:
 private:
   bool dropped_;
   boost::recursive_mutex drop_mutex_;
-  ros::ShmemDeque<sensor_msgs::PointCloud3>::Ptr deque_;
+  ros::ShmemDequeVoid::Ptr deque_;
 
 };
 typedef boost::shared_ptr<ShmemSubscriberLink> ShmemSubscriberLinkPtr;
