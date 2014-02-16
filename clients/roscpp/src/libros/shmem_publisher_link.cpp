@@ -73,7 +73,9 @@ void ShmemPublisherLink::threadRunner()
     boost::interprocess::scoped_lock<boost::interprocess::interprocess_mutex> lock(deque_->mutex_);
     deque_->signal_.wait(lock);
     fprintf(stderr,"ShmemPublisherLink::threadRunner() has been awakened!\n");
-    ShmemDequeVoid::VoidIPtr p = deque_->remove();
+    boost::uuids::uuid uuid = deque_->remove();
+    fprintf(stderr, "removed uuid %s from deque\n", boost::uuids::to_string(uuid).c_str());
+    sensor_msgs::PointCloud3* msg = MessageFactory::findMessage<sensor_msgs::PointCloud3>(uuid);
   }
 
 }

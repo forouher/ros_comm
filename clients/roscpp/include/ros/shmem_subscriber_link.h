@@ -58,7 +58,7 @@ public:
 private:
   bool dropped_;
   boost::recursive_mutex drop_mutex_;
-  ros::ShmemDequeVoid::Ptr deque_;
+  ros::ShmemDeque::Ptr deque_;
 
 };
 typedef boost::shared_ptr<ShmemSubscriberLink> ShmemSubscriberLinkPtr;

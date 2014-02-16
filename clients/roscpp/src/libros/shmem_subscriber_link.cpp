@@ -62,14 +62,13 @@ void ShmemSubscriberLink::enqueueMessage(const SerializedMessage& m, bool ser, b
 
   boost::interprocess::scoped_lock<boost::interprocess::interprocess_mutex> lock2(deque_->mutex_);
 
-  sensor_msgs::PointCloud3::IPtr foo = ros::MessageFactory::createMessage<sensor_msgs::PointCloud3>();
-  ShmemDequeVoid::VoidIPtr* foo_ptr = (ShmemDequeVoid::VoidIPtr*)(&foo);
-  ShmemDequeVoid::VoidIPtr foo2 = ShmemDequeVoid::VoidIPtr(*foo_ptr);
-  foo.reset(); foo_ptr = NULL;
-  fprintf(stderr, "use count of foo2: %i\n", foo2.use_count());
+  if (m.uuid.is_nil())
+    return;
 
-  deque_->add(foo2);
+//  sensor_msgs::PointCloud3* test_msg = ros::MessageFactory::createMessage<sensor_msgs::PointCloud3>();
 
+  fprintf(stderr, "adding uuid %s to deque\n", boost::uuids::to_string(test_msg->uuid).c_str());
+  deque_->add(test_msg->uuid);
   deque_->signal_.notify_one();
 
   if (dropped_)
