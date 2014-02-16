@@ -99,6 +99,7 @@ class ShmemDeque
   const VoidIPtr remove()
   {
 //    boost::interprocess::scoped_lock<boost::interprocess::interprocess_mutex> lock(mutex_);
+    fprintf(stderr,"popping message\n");
     VoidIPtr msg = store_.back();
     store_.pop_back();
     return msg;
@@ -175,8 +176,8 @@ static typename M::IPtr createMessage()
   typename M::allocator alloc (segment->get_segment_manager());
   M* msg = segment->construct<M>(boost::uuids::to_string(uuid).c_str())(alloc);
 
-  //typename M::IPtr p = typename M::IPtr(msg, alloc, typename M::deleter_type(segment->get_segment_manager()));
-  typename M::IPtr p = typename M::IPtr(msg, alloc, segment->get_deleter<M>());
+  typename M::IPtr p = typename M::IPtr(msg, alloc, typename M::deleter_type(segment->get_segment_manager()));
+  //typename M::IPtr p = typename M::IPtr(msg, alloc, segment->get_deleter<M>());
   return p;
 };
 
