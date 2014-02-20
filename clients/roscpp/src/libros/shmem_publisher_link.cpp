@@ -72,12 +72,12 @@ void ShmemPublisherLink::threadRunner()
   while (true) {
     boost::interprocess::scoped_lock<boost::interprocess::interprocess_mutex> lock(deque_->mutex_);
     deque_->signal_.wait(lock);
-    fprintf(stderr,"ShmemPublisherLink::threadRunner() has been awakened!\n");
+//    fprintf(stderr,"ShmemPublisherLink::threadRunner() has been awakened!\n");
 
     while (!deque_->isEmpty())
     {
       boost::uuids::uuid uuid = deque_->remove();
-      fprintf(stderr, "removed uuid %s from deque\n", boost::uuids::to_string(uuid).c_str());
+//      fprintf(stderr, "removed uuid %s from deque\n", boost::uuids::to_string(uuid).c_str());
       SerializedMessage msg;
       msg.uuid = uuid;
       handleMessage(msg, false, true);

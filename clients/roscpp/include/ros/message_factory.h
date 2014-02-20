@@ -99,8 +99,8 @@ class ShmemDeque
   {
 //    boost::interprocess::scoped_lock<boost::interprocess::interprocess_mutex> lock(mutex_);
 
-    if (store_.size()>10) {
-      fprintf(stderr,"deque is full, dropping msg\n");
+    if (store_.size()>1000) {
+//      fprintf(stderr,"deque is full, dropping msg\n");
       return;
     }
 
@@ -111,7 +111,7 @@ class ShmemDeque
   const boost::uuids::uuid remove()
   {
 //    boost::interprocess::scoped_lock<boost::interprocess::interprocess_mutex> lock(mutex_);
-    fprintf(stderr,"popping message\n");
+//    fprintf(stderr,"popping message\n");
     boost::uuids::uuid uuid =store_.back();
     store_.pop_back();
     return uuid;
@@ -167,7 +167,7 @@ static M* createMessage()
   typename M::allocator alloc (segment->get_segment_manager());
   M* msg = segment->construct<M>(boost::uuids::to_string(uuid).c_str())(alloc);
   msg->uuid = uuid;
-  fprintf(stderr, "Created message with UUID %s\n", boost::uuids::to_string(msg->uuid).c_str());
+//  fprintf(stderr, "Created message with UUID %s\n", boost::uuids::to_string(msg->uuid).c_str());
 //  typename M::Ptr p = typename M::Ptr(msg, &DummyDeleter<M>);
   return msg;
 };
@@ -196,7 +196,8 @@ static void destroyMessage(const M* msg)
   }
 
   ROS_ASSERT(segment);
-
+  ROS_ASSERT(msg);
+  //fprintf(stderr," Destroying message: %s\n", msg->uuid);
   segment->destroy_ptr<M>(msg);
 };
 

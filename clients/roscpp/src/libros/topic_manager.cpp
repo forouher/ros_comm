@@ -796,7 +796,7 @@ void TopicManager::publish(const std::string& topic, const boost::function<Seria
     nocopy = false;
 
     // We can only do a no-copy publish if a shared_ptr to the message is provided, and we have type information for it
-    if (m.type_info && m.message)
+    if ((m.type_info && m.message) || !m.uuid.is_nil())
     {
       p->getPublishTypes(serialize, nocopy, shmem, *m.type_info);
     }
@@ -814,7 +814,7 @@ void TopicManager::publish(const std::string& topic, const boost::function<Seria
     }
 
     if (!m.uuid.is_nil()) {
-        fprintf(stderr,"got UUID msg: %s\n", boost::uuids::to_string(m.uuid).c_str());
+//        fprintf(stderr,"got UUID msg: %s\n", boost::uuids::to_string(m.uuid).c_str());
     }
 
     // TODO: latching will not work yet, as messages cannot be sent twice
@@ -837,7 +837,7 @@ void TopicManager::publish(const std::string& topic, const boost::function<Seria
 
     // If we're not doing a serialized publish we don't need to signal the pollset.  The write()
     // call inside signal() is actually relatively expensive when doing a nocopy publish.
-    if (serialize || shmem)
+    if (serialize || shmem || !m.uuid.is_nil())
     {
       poll_manager_->getPollSet().signal();
     }

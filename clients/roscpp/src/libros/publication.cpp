@@ -408,7 +408,7 @@ bool Publication::hasSubscribers()
 
 void Publication::publish(SerializedMessage& m)
 {
-  if (m.message || m.memfd_message)
+  if (m.message || m.memfd_message || !m.uuid.is_nil())
   {
     boost::mutex::scoped_lock lock(subscriber_links_mutex_);
     V_SubscriberLink::const_iterator it = subscriber_links_.begin();
@@ -416,7 +416,7 @@ void Publication::publish(SerializedMessage& m)
     for (; it != end; ++it)
     {
       const SubscriberLinkPtr& sub = *it;
-      if (m.message && sub->isIntraprocess())
+      if ((m.message && sub->isIntraprocess()) || !m.uuid.is_nil())
       {
         sub->enqueueMessage(m, false, true);
       }
@@ -433,7 +433,7 @@ void Publication::publish(SerializedMessage& m)
     m.message.reset();
   }
 
-  if (m.buf || m.memfd_message)
+  if (m.uuid.is_nil() && (m.buf || m.memfd_message))
   {
     boost::mutex::scoped_lock lock(publish_queue_mutex_);
     publish_queue_.push_back(m);

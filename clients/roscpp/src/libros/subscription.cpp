@@ -406,8 +406,8 @@ bool Subscription::negotiateConnection(const std::string& xmlrpc_uri)
       my_endpoint_name = replaceStrChar(my_endpoint_name, '/', '.');
       kdbusros_array[0] = std::string("KDBusROS");
       kdbusros_array[1] = my_endpoint_name;
-      protos_array[protos++] = kdbusros_array;
-      ROS_DEBUG("Adding KDBus as proto offer");
+//      protos_array[protos++] = kdbusros_array;
+//      ROS_DEBUG("Adding KDBus as proto offer");
     }
     else if (*it == "Shmem")
     {
