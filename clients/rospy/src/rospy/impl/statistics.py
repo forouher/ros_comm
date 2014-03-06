@@ -65,6 +65,8 @@ from rospy.exceptions import ROSSerializationException, TransportTerminated
 from rospy.msg import serialize_message, args_kwds_to_message
 from rosgraph_msgs.msg import TopicStatistics
 
+import numpy
+
 from rospy.impl.registration import get_topic_manager, set_topic_manager, Registration, get_registration_listeners
 from rospy.impl.tcpros import get_tcpros_handler, DEFAULT_BUFF_SIZE
 
@@ -163,6 +165,11 @@ class ConnectionStatisticsLogger():
         self.dropped_msgs_ = 0
 	self.window_start = rospy.Time.now()
 
+	self.wind_size_ = 20
+	self.z_ = [0]*self.wind_size_
+	self.w_ = [0]*self.wind_size_
+	self.L_ = 0
+
         pass
 
     def sendStatistics(self):
@@ -208,6 +215,8 @@ class ConnectionStatisticsLogger():
 	    msg.period_variance = float('NaN')
             msg.period_max = float('NaN')
 
+	msg.error = self.error_
+
         self.pub.publish(msg)
 
 	if len(self.arrival_time_list_) < MIN_ELEMENTS and self.pub_frequency*2 <= MAX_WINDOW:
@@ -215,9 +224,37 @@ class ConnectionStatisticsLogger():
 	if len(self.arrival_time_list_) > MAX_ELEMENTS and self.pub_frequency/2 >= MIN_WINDOW:
 	    self.pub_frequency /= 2
 
+
 	self.delay_list_ = []
 	self.arrival_time_list_ = []
         self.dropped_msgs_ = 0
+	self.error_ = 0
+        self.last_pub_time = rospy.Time.now()
+
+    def error_detection(self, last_time):
+
+	z_t = rospy.Time.now().to_sec() - last_time
+
+	# 1. e_t berechnen
+	e = z_t - numpy.dot(self.z_,self.w_)
+
+	# 3. L_ in msg ausgeben, wenn zu gross ( evtl. senden enforcen)
+	X = 0.1
+	self.L_ = max(0,self.L_ + e - X)
+	if self.L_ > 0.1:
+	    self.error_ = 1
+	
+#	print "all right, z="+str(z_t)+" e="+str(e)+" L="+str(self.L_)+" w="+str(self.w_)+" z="+str(self.z_)
+
+	# 4. z aktualisieren
+	# TODO down/upsampling auf X hz
+	self.z_.pop(0)
+	self.z_.append(z_t)
+
+	# 5. gewichte berechnen
+	z_sq = numpy.dot(self.z_,self.z_)
+	for i in range(0,self.wind_size_):
+	    self.w_[i] = self.w_[i] + e*self.z_[i]/z_sq
 
     def callback(self,msg, stat_bytes):
         """
@@ -244,8 +281,11 @@ class ConnectionStatisticsLogger():
                 self.dropped_msgs_ = self.dropped_msgs_ + 1
     	    self.last_seq_ = msg.header.seq
 
-        if self.last_pub_time + self.pub_frequency < rospy.Time.now():
-            self.last_pub_time = rospy.Time.now()
+	if len(self.arrival_time_list_) >= 2:
+    	    self.error_detection(self.arrival_time_list_[-2])
+
+	# TODO: if the error persists, throttle the statistics
+        if self.error_ or self.last_pub_time + self.pub_frequency < rospy.Time.now():
             self.sendStatistics()
 
 

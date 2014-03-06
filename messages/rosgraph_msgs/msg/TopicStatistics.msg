@@ -28,3 +28,6 @@ float32 period_max
 float32 stamp_delay_mean
 float32 stamp_delay_variance
 float32 stamp_delay_max
+
+# has the period or delay changed?
+bool error
