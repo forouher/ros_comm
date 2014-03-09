@@ -168,6 +168,7 @@ class ConnectionStatisticsLogger():
 	self.wind_size_ = 20
 	self.z_ = [0]*self.wind_size_
 	self.w_ = [0]*self.wind_size_
+	self.e_ = [0]*self.wind_size_
 	self.L_ = 0
 
         pass
@@ -239,9 +240,10 @@ class ConnectionStatisticsLogger():
 	e = z_t - numpy.dot(self.z_,self.w_)
 
 	# 3. L_ in msg ausgeben, wenn zu gross ( evtl. senden enforcen)
-	X = 0.1
+	X = numpy.std(self.e_)
+	L_limit = 0.01
 	self.L_ = max(0,self.L_ + e - X)
-	if self.L_ > 0.1:
+	if self.L_ > L_limit:
 	    self.error_ = 1
 	
 #	print "all right, z="+str(z_t)+" e="+str(e)+" L="+str(self.L_)+" w="+str(self.w_)+" z="+str(self.z_)
@@ -250,6 +252,8 @@ class ConnectionStatisticsLogger():
 	# TODO down/upsampling auf X hz
 	self.z_.pop(0)
 	self.z_.append(z_t)
+	self.e_.pop(0)
+	self.e_.append(e)
 
 	# 5. gewichte berechnen
 	z_sq = numpy.dot(self.z_,self.z_)
