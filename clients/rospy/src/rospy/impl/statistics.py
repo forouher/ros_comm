@@ -194,7 +194,9 @@ class ConnectionStatisticsLogger():
 	self.z_ = [0]*self.wind_size_
 	self.w_ = [0]*self.wind_size_
 	self.e_ = [0]*self.wind_size_
+	self.x_ = [1]*self.wind_size_
 	self.L_ = 0
+	self.error_ = 0
 
 	# temporary variables
 	self.stat_bytes_last_ = 0
@@ -278,7 +280,7 @@ class ConnectionStatisticsLogger():
 	z_t = rospy.Time.now().to_sec() - last_time
 
 	# 1. e_t berechnen
-	e = z_t - numpy.dot(self.z_,self.w_)
+	e = z_t - numpy.dot(self.x_,self.w_)
 
 	# 3. L_ in msg ausgeben, wenn zu gross ( evtl. senden enforcen)
 	X = numpy.std(self.e_)
@@ -287,8 +289,6 @@ class ConnectionStatisticsLogger():
 	if self.L_ > L_limit:
 	    self.error_ = 1
 	
-#	rospy.logwarn("all right, z="+str(z_t)+" e="+str(e)+" L="+str(self.L_)+" w="+str(self.w_)+" z="+str(self.z_))
-	rospy.logwarn("all right, z="+str(z_t)+" e="+str(e)+" L="+str(self.L_)+" w="+str(self.w_))
 
 	# 4. z aktualisieren
 	# TODO down/upsampling auf X hz
@@ -298,9 +298,11 @@ class ConnectionStatisticsLogger():
 	self.e_.append(e)
 
 	# 5. gewichte berechnen
-	z_sq = numpy.dot(self.z_,self.z_)
+	x_sq = numpy.dot(self.x_,self.x_)
 	for i in range(0,self.wind_size_):
-	    self.w_[i] = self.w_[i] + e*self.z_[i]/z_sq
+	    self.w_[i] = self.w_[i] + e*self.x_[i] / x_sq
+
+#	rospy.logwarn("all right, z="+str(z_t)+" e="+str(e)+" L="+str(self.L_)+" w="+str(self.w_))
 
     def callback(self,msg, stat_bytes):
         """
