@@ -71,14 +71,14 @@ from rospy.impl.tcpros import get_tcpros_handler, DEFAULT_BUFF_SIZE
 _logger = logging.getLogger('rospy.impl.statistics')
 
 # Range of window length, in seconds
-MAX_WINDOW = 64
-MIN_WINDOW = 4
+MAX_WINDOW = 2
+MIN_WINDOW = 1
 
 # Range of acceptable messages in window.
 # Window size will be adjusted if number of observed is
 # outside this range.
-MAX_ELEMENTS = 100
-MIN_ELEMENTS = 10
+MAX_ELEMENTS = 100000
+MIN_ELEMENTS = 1
 
 # wrap genpy implementation and map it to rospy namespace
 import genpy
@@ -177,7 +177,8 @@ class ConnectionStatisticsLogger():
 
 	# reset window
 	self.last_pub_time = rospy.Time(0)
-	self.pub_frequency = rospy.Duration(4.0)
+	self.last_error_pub_ = rospy.Time(0)
+	self.pub_frequency = rospy.Duration(1.0)
 
         # timestamp delay
 	self.delay_list_ = []
@@ -247,20 +248,28 @@ class ConnectionStatisticsLogger():
 	    msg.period_variance = float('NaN')
             msg.period_max = float('NaN')
 
-	msg.error = self.error_
+	if self.error_:
+	    msg.status = TopicStatistics.STATUS_ERROR
+	else:
+	    msg.status = TopicStatistics.STATUS_OK
+
+        msg.L = self.L_
+	msg.e = self.e_[-1]
 
         self.pub.publish(msg)
 
 	# adjust window, if message count is not appropriate.
-	if len(self.arrival_time_list_) < MIN_ELEMENTS and self.pub_frequency*2 <= MAX_WINDOW:
-	    self.pub_frequency *= 2
-	if len(self.arrival_time_list_) > MAX_ELEMENTS and self.pub_frequency/2 >= MIN_WINDOW:
-	    self.pub_frequency /= 2
+#	if len(self.arrival_time_list_) < MIN_ELEMENTS and self.pub_frequency*2 <= MAX_WINDOW:
+#	    self.pub_frequency *= 2
+#	if len(self.arrival_time_list_) > MAX_ELEMENTS and self.pub_frequency/2 >= MIN_WINDOW:
+#	    self.pub_frequency /= 2
 
 	# clear collected stats, start new window.
 	self.delay_list_ = []
 	self.arrival_time_list_ = []
         self.dropped_msgs_ = 0
+	if self.error_:
+	    self.last_error_pub_ = rospy.Time.now()
 	self.error_ = 0
         self.last_pub_time = rospy.Time.now()
 
@@ -273,12 +282,13 @@ class ConnectionStatisticsLogger():
 
 	# 3. L_ in msg ausgeben, wenn zu gross ( evtl. senden enforcen)
 	X = numpy.std(self.e_)
-	L_limit = 0.01
+	L_limit = 2
 	self.L_ = max(0,self.L_ + e - X)
 	if self.L_ > L_limit:
 	    self.error_ = 1
 	
-#	print "all right, z="+str(z_t)+" e="+str(e)+" L="+str(self.L_)+" w="+str(self.w_)+" z="+str(self.z_)
+#	rospy.logwarn("all right, z="+str(z_t)+" e="+str(e)+" L="+str(self.L_)+" w="+str(self.w_)+" z="+str(self.z_))
+	rospy.logwarn("all right, z="+str(z_t)+" e="+str(e)+" L="+str(self.L_)+" w="+str(self.w_))
 
 	# 4. z aktualisieren
 	# TODO down/upsampling auf X hz
@@ -331,7 +341,7 @@ class ConnectionStatisticsLogger():
     	    self.error_detection(self.arrival_time_list_[-2])
 
 	# send out statistics with a certain frequency
-        if self.error_ or self.last_pub_time + self.pub_frequency < rospy.Time.now():
+        if (self.error_ and self.last_error_pub_ + self.pub_frequency < rospy.Time.now()) or self.last_pub_time + self.pub_frequency < rospy.Time.now():
             self.sendStatistics()
 
 

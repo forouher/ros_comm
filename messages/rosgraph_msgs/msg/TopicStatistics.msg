@@ -30,4 +30,11 @@ float32 stamp_delay_variance
 float32 stamp_delay_max
 
 # has the period or delay changed?
-bool error
+byte status
+float32 L
+float32 e
+
+byte STATUS_UNKNOWN=0
+byte STATUS_OK=1
+byte STATUS_ERROR=2
+
