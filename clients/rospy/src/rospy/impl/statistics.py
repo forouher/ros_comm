@@ -142,6 +142,51 @@ class SubscriberStatisticsLogger():
 	# delegate stuff to that instance
 	logger.callback(msg, stat_bytes)
 
+class ChangeDetector():
+
+    def __init__(self, window_size):
+	self.wind_size_ = window_size
+	self.z_ = [0]*self.wind_size_
+	self.w_ = [0]*self.wind_size_
+	self.e_ = [0]*self.wind_size_
+	self.x_ = [1]*self.wind_size_
+	self.L_ = 0
+	self.Lm_ = 0
+	self.error_ = 0
+        pass
+
+    def update(self, z_t):
+
+	# 1. e_t berechnen
+	e = z_t - numpy.dot(self.z_,self.w_)
+
+	# 3. L_ in msg ausgeben, wenn zu gross ( evtl. senden enforcen)
+	X = numpy.std(self.e_)
+	L_limit = 5*X
+	self.L_ = max(0, self.L_ + e - 0.8*X)
+	self.Lm_ = min(0, self.Lm_ - e + 0.8*X)
+	if self.L_ > L_limit or self.Lm_ < -L_limit:
+	    self.L_ = 0
+	    self.Lm_ = 0
+	    self.error_ = 1
+
+	# 4. z aktualisieren
+	# TODO down/upsampling auf X hz
+	self.e_.pop(0)
+	self.e_.append(e)
+
+	# 5. gewichte berechnen
+	z_sq = numpy.dot(self.z_,self.z_)
+	if z_sq==0:
+	    z_sq=1
+	for i in range(0,self.wind_size_):
+	    self.w_[i] = self.w_[i] + 0.1*e*self.z_[i] / z_sq
+
+	self.z_.pop(0)
+	self.z_.append(z_t)
+
+#	rospy.logwarn(rospy.get_name()+": z="+str(z_t)+" e="+str(e)+" L="+str(self.L_)+" Lm="+str(self.Lm_))
+
 class ConnectionStatisticsLogger():
     """
     Class that monitors lots of stuff for each connection
@@ -190,14 +235,8 @@ class ConnectionStatisticsLogger():
         self.dropped_msgs_ = 0
 	self.window_start = rospy.Time.now()
 
-	self.wind_size_ = 100
-	self.z_ = [0]*self.wind_size_
-	self.w_ = [0]*self.wind_size_
-	self.e_ = [0]*self.wind_size_
-	self.x_ = [1]*self.wind_size_
-	self.L_ = 0
-	self.Lm_ = 0
-	self.error_ = 0
+	self.change_period = ChangeDetector(100)
+	self.change_delay = ChangeDetector(100)
 
 	# temporary variables
 	self.stat_bytes_last_ = 0
@@ -251,13 +290,16 @@ class ConnectionStatisticsLogger():
 	    msg.period_variance = float('NaN')
             msg.period_max = float('NaN')
 
-	if self.error_:
+	if self.change_delay.error_:
 	    msg.status = TopicStatistics.STATUS_ERROR
+    	    msg.L = max(self.change_delay.L_,self.change_delay.Lm_)
+	    msg.e = self.change_delay.e_[-1]
+	elif self.change_period.error_:
+	    msg.status = TopicStatistics.STATUS_ERROR
+    	    msg.L = max(self.change_period.L_,self.change_period.Lm_)
+	    msg.e = self.change_period.e_[-1]
 	else:
 	    msg.status = TopicStatistics.STATUS_OK
-
-        msg.L = self.L_
-	msg.e = self.e_[-1]
 
         self.pub.publish(msg)
 
@@ -271,44 +313,12 @@ class ConnectionStatisticsLogger():
 	self.delay_list_ = []
 	self.arrival_time_list_ = []
         self.dropped_msgs_ = 0
-	if self.error_:
+        if self.change_period.error_ or self.change_delay.error_:
 	    self.last_error_pub_ = rospy.Time.now()
-	self.error_ = 0
+	self.change_period.error_ = 0
+	self.change_delay.error_ = 0
         self.last_pub_time = rospy.Time.now()
 
-    def error_detection(self, last_time):
-
-	z_t = rospy.Time.now().to_sec() - last_time
-
-	# 1. e_t berechnen
-	e = z_t - numpy.dot(self.z_,self.w_)
-
-	# 3. L_ in msg ausgeben, wenn zu gross ( evtl. senden enforcen)
-	X = numpy.std(self.e_)
-	L_limit = 5*X
-	self.L_ = max(0, self.L_ + e - 0.8*X)
-	self.Lm_ = min(0, self.Lm_ - e + 0.8*X)
-	if self.L_ > L_limit or self.Lm_ < -L_limit:
-	    self.L_ = 0
-	    self.Lm_ = 0
-	    self.error_ = 1
-
-	# 4. z aktualisieren
-	# TODO down/upsampling auf X hz
-	self.e_.pop(0)
-	self.e_.append(e)
-
-	# 5. gewichte berechnen
-	z_sq = numpy.dot(self.z_,self.z_)
-	if z_sq==0:
-	    z_sq=1
-	for i in range(0,self.wind_size_):
-	    self.w_[i] = self.w_[i] + 0.1*e*self.z_[i] / z_sq
-
-	self.z_.pop(0)
-	self.z_.append(z_t)
-
-	rospy.logwarn(rospy.get_name()+": z="+str(z_t)+" e="+str(e)+" L="+str(self.L_)+" Lm="+str(self.Lm_))
 
     def callback(self,msg, stat_bytes):
         """
@@ -346,10 +356,11 @@ class ConnectionStatisticsLogger():
     	    self.last_seq_ = msg.header.seq
 
 	if len(self.arrival_time_list_) >= 2:
-    	    self.error_detection(self.arrival_time_list_[-2])
+	    z_t = rospy.Time.now().to_sec() - self.arrival_time_list_[-2]
+    	    self.change_period.update(z_t)
 
 	# send out statistics with a certain frequency
-        if (self.error_ and self.last_error_pub_ + self.pub_frequency < rospy.Time.now()) or self.last_pub_time + self.pub_frequency < rospy.Time.now():
+        if ((self.change_period.error_ or self.change_delay.error_) and self.last_error_pub_ + self.pub_frequency < rospy.Time.now()) or self.last_pub_time + self.pub_frequency < rospy.Time.now():
             self.sendStatistics()
 
 
