@@ -357,7 +357,7 @@ class ConnectionStatisticsLogger():
                 self.dropped_msgs_ = self.dropped_msgs_ + 1
     	    self.last_seq_ = msg.header.seq
 
-    	    self.change_delay.update(self.delay_list_.append[-1])
+   	    self.change_delay.update(self.delay_list_[-1])
 
 	if len(self.arrival_time_list_) >= 2:
 	    z_t = rospy.Time.now().to_sec() - self.arrival_time_list_[-2]
