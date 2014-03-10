@@ -190,12 +190,13 @@ class ConnectionStatisticsLogger():
         self.dropped_msgs_ = 0
 	self.window_start = rospy.Time.now()
 
-	self.wind_size_ = 20
+	self.wind_size_ = 100
 	self.z_ = [0]*self.wind_size_
 	self.w_ = [0]*self.wind_size_
 	self.e_ = [0]*self.wind_size_
 	self.x_ = [1]*self.wind_size_
 	self.L_ = 0
+	self.Lm_ = 0
 	self.error_ = 0
 
 	# temporary variables
@@ -280,29 +281,34 @@ class ConnectionStatisticsLogger():
 	z_t = rospy.Time.now().to_sec() - last_time
 
 	# 1. e_t berechnen
-	e = z_t - numpy.dot(self.x_,self.w_)
+	e = z_t - numpy.dot(self.z_,self.w_)
 
 	# 3. L_ in msg ausgeben, wenn zu gross ( evtl. senden enforcen)
 	X = numpy.std(self.e_)
-	L_limit = 2
-	self.L_ = max(0,self.L_ + e - X)
-	if self.L_ > L_limit:
+	L_limit = 5*X
+	self.L_ = max(0, self.L_ + e - 0.8*X)
+	self.Lm_ = min(0, self.Lm_ - e + 0.8*X)
+	if self.L_ > L_limit or self.Lm_ < -L_limit:
+	    self.L_ = 0
+	    self.Lm_ = 0
 	    self.error_ = 1
-	
 
 	# 4. z aktualisieren
 	# TODO down/upsampling auf X hz
-	self.z_.pop(0)
-	self.z_.append(z_t)
 	self.e_.pop(0)
 	self.e_.append(e)
 
 	# 5. gewichte berechnen
-	x_sq = numpy.dot(self.x_,self.x_)
+	z_sq = numpy.dot(self.z_,self.z_)
+	if z_sq==0:
+	    z_sq=1
 	for i in range(0,self.wind_size_):
-	    self.w_[i] = self.w_[i] + e*self.x_[i] / x_sq
+	    self.w_[i] = self.w_[i] + 0.1*e*self.z_[i] / z_sq
 
-#	rospy.logwarn("all right, z="+str(z_t)+" e="+str(e)+" L="+str(self.L_)+" w="+str(self.w_))
+	self.z_.pop(0)
+	self.z_.append(z_t)
+
+	rospy.logwarn(rospy.get_name()+": z="+str(z_t)+" e="+str(e)+" L="+str(self.L_)+" Lm="+str(self.Lm_))
 
     def callback(self,msg, stat_bytes):
         """
