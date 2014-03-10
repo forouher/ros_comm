@@ -291,14 +291,16 @@ class ConnectionStatisticsLogger():
             msg.period_max = float('NaN')
 
 	if self.change_delay.error_:
-	    msg.status = TopicStatistics.STATUS_ERROR
-    	    msg.L = max(self.change_delay.L_,self.change_delay.Lm_)
-	    msg.e = self.change_delay.e_[-1]
-	elif self.change_period.error_:
-	    msg.status = TopicStatistics.STATUS_ERROR
-    	    msg.L = max(self.change_period.L_,self.change_period.Lm_)
-	    msg.e = self.change_period.e_[-1]
-	else:
+	    msg.status = msg.status | TopicStatistics.STATUS_ERROR_DELAY
+    	    msg.L_delay = max(self.change_delay.L_,self.change_delay.Lm_)
+	    msg.e_delay = self.change_delay.e_[-1]
+
+	if self.change_period.error_:
+	    msg.status = msg.status | TopicStatistics.STATUS_ERROR_PERIOD
+    	    msg.L_period = max(self.change_period.L_,self.change_period.Lm_)
+	    msg.e_period = self.change_period.e_[-1]
+
+	if not msg.status:
 	    msg.status = TopicStatistics.STATUS_OK
 
         self.pub.publish(msg)
@@ -354,6 +356,8 @@ class ConnectionStatisticsLogger():
     	    if self.last_seq_ + 1 != msg.header.seq:
                 self.dropped_msgs_ = self.dropped_msgs_ + 1
     	    self.last_seq_ = msg.header.seq
+
+    	    self.change_delay.update(self.delay_list_.append[-1])
 
 	if len(self.arrival_time_list_) >= 2:
 	    z_t = rospy.Time.now().to_sec() - self.arrival_time_list_[-2]
