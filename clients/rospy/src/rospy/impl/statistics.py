@@ -152,7 +152,8 @@ class ChangeDetector():
 	self.x_ = [1]*self.wind_size_
 	self.L_ = 0
 	self.Lm_ = 0
-	self.error_ = 0
+	self.event_ = 0
+	self.changes_ = 0
         pass
 
     def update(self, z_t):
@@ -168,7 +169,8 @@ class ChangeDetector():
 	if self.L_ > L_limit or self.Lm_ < -L_limit:
 	    self.L_ = 0
 	    self.Lm_ = 0
-	    self.error_ = 1
+	    self.changes_ = self.changes_ + 1
+	    self.event_ = 1
 
 	# 4. z aktualisieren
 	# TODO down/upsampling auf X hz
@@ -290,18 +292,14 @@ class ConnectionStatisticsLogger():
 	    msg.period_variance = float('NaN')
             msg.period_max = float('NaN')
 
-	if self.change_delay.error_:
-	    msg.status = msg.status | TopicStatistics.STATUS_ERROR_DELAY
-    	    msg.L_delay = max(self.change_delay.L_,self.change_delay.Lm_)
-	    msg.e_delay = self.change_delay.e_[-1]
+	msg.changes_delay = self.change_delay.changes_
+	msg.changes_period = self.change_period.changes_
 
-	if self.change_period.error_:
-	    msg.status = msg.status | TopicStatistics.STATUS_ERROR_PERIOD
-    	    msg.L_period = max(self.change_period.L_,self.change_period.Lm_)
-	    msg.e_period = self.change_period.e_[-1]
-
-	if not msg.status:
-	    msg.status = TopicStatistics.STATUS_OK
+	# debugging
+    	msg.L_delay = max(self.change_delay.L_,self.change_delay.Lm_)
+	msg.e_delay = self.change_delay.e_[-1]
+    	msg.L_period = max(self.change_period.L_,self.change_period.Lm_)
+	msg.e_period = self.change_period.e_[-1]
 
         self.pub.publish(msg)
 
@@ -315,10 +313,10 @@ class ConnectionStatisticsLogger():
 	self.delay_list_ = []
 	self.arrival_time_list_ = []
         self.dropped_msgs_ = 0
-        if self.change_period.error_ or self.change_delay.error_:
+        if self.change_period.event_ or self.change_delay.event_:
 	    self.last_error_pub_ = rospy.Time.now()
-	self.change_period.error_ = 0
-	self.change_delay.error_ = 0
+	self.change_period.event_ = 0
+	self.change_delay.event_ = 0
         self.last_pub_time = rospy.Time.now()
 
 
@@ -364,7 +362,7 @@ class ConnectionStatisticsLogger():
     	    self.change_period.update(z_t)
 
 	# send out statistics with a certain frequency
-        if ((self.change_period.error_ or self.change_delay.error_) and self.last_error_pub_ + self.pub_frequency < rospy.Time.now()) or self.last_pub_time + self.pub_frequency < rospy.Time.now():
+        if ((self.change_period.event_ or self.change_delay.event_) and self.last_error_pub_ + self.pub_frequency < rospy.Time.now()) or self.last_pub_time + self.pub_frequency < rospy.Time.now():
             self.sendStatistics()
 
 

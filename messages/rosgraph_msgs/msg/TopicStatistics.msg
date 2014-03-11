@@ -29,14 +29,11 @@ float32 stamp_delay_mean
 float32 stamp_delay_variance
 float32 stamp_delay_max
 
-# has the period or delay changed?
-byte status
+# has the period or delay changed. count the change events
+int32 changes_period
+int32 changes_delay
+
 float32 L_period
 float32 L_delay
 float32 e_period
 float32 e_delay
-
-byte STATUS_UNKNOWN=0
-byte STATUS_OK=1
-byte STATUS_ERROR_PERIOD=2
-byte STATUS_ERROR_DELAY=4
