@@ -147,7 +147,6 @@ class ChangeDetector():
     def __init__(self, window_size):
 	self.wind_size_ = window_size
 	self.z_ = [0]*self.wind_size_
-	self.w_ = [0]*self.wind_size_
 	self.e_ = [0]*self.wind_size_
 	self.x_ = [1]*self.wind_size_
 	self.L_ = 0
@@ -158,14 +157,15 @@ class ChangeDetector():
     def update(self, z_t):
 
 	# 1. e_t berechnen
-	e = z_t - numpy.dot(self.z_,self.w_)
+	hl = 0.9
+	e = z_t - (hl*numpy.mean(self.z_) + (1-hl)*z_t)
 
 	# 3. L_ in msg ausgeben, wenn zu gross ( evtl. senden enforcen)
 	X = numpy.std(self.e_)
-	L_limit = 5*X
-	self.L_ = max(0, self.L_ + e - 0.8*X)
-	self.Lm_ = min(0, self.Lm_ - e + 0.8*X)
-	if self.L_ > L_limit or self.Lm_ < -L_limit:
+	L_limit = 50*X
+	self.L_ = max(0, self.L_ + e - 2*X)
+	self.Lm_ = max(0, self.Lm_ - e - 2*X)
+	if self.L_ > L_limit or self.Lm_ > L_limit:
 	    self.L_ = 0
 	    self.Lm_ = 0
 	    self.error_ = 1
@@ -174,13 +174,6 @@ class ChangeDetector():
 	# TODO down/upsampling auf X hz
 	self.e_.pop(0)
 	self.e_.append(e)
-
-	# 5. gewichte berechnen
-	z_sq = numpy.dot(self.z_,self.z_)
-	if z_sq==0:
-	    z_sq=1
-	for i in range(0,self.wind_size_):
-	    self.w_[i] = self.w_[i] + 0.1*e*self.z_[i] / z_sq
 
 	self.z_.pop(0)
 	self.z_.append(z_t)
@@ -235,8 +228,8 @@ class ConnectionStatisticsLogger():
         self.dropped_msgs_ = 0
 	self.window_start = rospy.Time.now()
 
-	self.change_period = ChangeDetector(100)
-	self.change_delay = ChangeDetector(100)
+	self.change_period = ChangeDetector(20)
+	self.change_delay = ChangeDetector(20)
 
 	# temporary variables
 	self.stat_bytes_last_ = 0
