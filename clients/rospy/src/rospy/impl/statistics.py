@@ -146,7 +146,7 @@ class ChangeDetector():
 
     def __init__(self, window_size):
 	self.wind_size_ = window_size
-	self.z_ = [0]*self.wind_size_
+	self.z_ = 0
 	self.e_ = [0]*self.wind_size_
 	self.x_ = [1]*self.wind_size_
 	self.L_ = 0
@@ -157,14 +157,13 @@ class ChangeDetector():
     def update(self, z_t):
 
 	# 1. e_t berechnen
-	hl = 0.9
-	e = z_t - (hl*numpy.mean(self.z_) + (1-hl)*z_t)
+	e = z_t - self.z_
 
 	# 3. L_ in msg ausgeben, wenn zu gross ( evtl. senden enforcen)
 	X = numpy.std(self.e_)
 	L_limit = 50*X
-	self.L_ = max(0, self.L_ + e - 2*X)
-	self.Lm_ = max(0, self.Lm_ - e - 2*X)
+	self.L_ = max(0, self.L_ + e - 5*X)
+	self.Lm_ = max(0, self.Lm_ - e - 5*X)
 	if self.L_ > L_limit or self.Lm_ > L_limit:
 	    self.L_ = 0
 	    self.Lm_ = 0
@@ -175,8 +174,8 @@ class ChangeDetector():
 	self.e_.pop(0)
 	self.e_.append(e)
 
-	self.z_.pop(0)
-	self.z_.append(z_t)
+	hl = 0.95
+	self.z_ = hl*self.z_ + (1-hl)*z_t
 
 #	rospy.logwarn(rospy.get_name()+": z="+str(z_t)+" e="+str(e)+" L="+str(self.L_)+" Lm="+str(self.Lm_))
 
