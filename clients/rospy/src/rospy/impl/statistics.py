@@ -212,6 +212,7 @@ class ConnectionStatisticsLogger():
 	self.publisher = publisher
 
 	self.pub = rospy.Publisher(_STATISTICS_TOPIC, TopicStatistics)
+	self.pub_debug = rospy.Publisher("/statistics_dbg", TopicStatistics)
 
 	# reset window
 	self.last_pub_time = rospy.Time(0)
@@ -236,7 +237,7 @@ class ConnectionStatisticsLogger():
 	self.stat_bytes_window_ = 0
         pass
 
-    def sendStatistics(self):
+    def sendStatistics(self, pub, silent):
 	"""
 	Send out statistics. Aggregate collected stats information.
 
@@ -246,7 +247,8 @@ class ConnectionStatisticsLogger():
 	curtime = rospy.Time.now()
 
 	window_start = self.window_start
-	self.window_start = curtime
+	if not silent:
+	    self.window_start = curtime
 
 	msg = TopicStatistics()
 	msg.topic = self.topic
@@ -283,10 +285,11 @@ class ConnectionStatisticsLogger():
 	    msg.period_variance = float('NaN')
             msg.period_max = float('NaN')
 
-        if self.change_period.event_:
-	    self.change_period.changes_ = self.change_period.changes_ + 1
-        if self.change_delay.event_:
-	    self.change_delay.changes_ = self.change_delay.changes_ + 1
+	if not silent:
+    	    if self.change_period.event_:
+		self.change_period.changes_ = self.change_period.changes_ + 1
+    	    if self.change_delay.event_:
+	        self.change_delay.changes_ = self.change_delay.changes_ + 1
 
 	msg.changes_delay = self.change_delay.changes_
 	msg.changes_period = self.change_period.changes_
@@ -297,7 +300,7 @@ class ConnectionStatisticsLogger():
     	msg.L_period = max(self.change_period.L_,self.change_period.Lm_)
 	msg.e_period = self.change_period.e_[-1]
 
-        self.pub.publish(msg)
+        pub.publish(msg)
 
 	# adjust window, if message count is not appropriate.
 #	if len(self.arrival_time_list_) < MIN_ELEMENTS and self.pub_frequency*2 <= MAX_WINDOW:
@@ -306,14 +309,15 @@ class ConnectionStatisticsLogger():
 #	    self.pub_frequency /= 2
 
 	# clear collected stats, start new window.
-	self.delay_list_ = []
-	self.arrival_time_list_ = []
-        self.dropped_msgs_ = 0
-        if self.change_period.event_ or self.change_delay.event_:
-	    self.last_error_pub_ = rospy.Time.now()
-	self.change_period.event_ = 0
-	self.change_delay.event_ = 0
-        self.last_pub_time = rospy.Time.now()
+	if not silent:
+	    self.delay_list_ = []
+	    self.arrival_time_list_ = []
+    	    self.dropped_msgs_ = 0
+    	    if self.change_period.event_ or self.change_delay.event_:
+		self.last_error_pub_ = rospy.Time.now()
+	    self.change_period.event_ = 0
+	    self.change_delay.event_ = 0
+    	    self.last_pub_time = rospy.Time.now()
 
 
     def callback(self,msg, stat_bytes):
@@ -356,9 +360,10 @@ class ConnectionStatisticsLogger():
 	if len(self.arrival_time_list_) >= 2:
 	    z_t = rospy.Time.now().to_sec() - self.arrival_time_list_[-2]
     	    self.change_period.update(z_t)
+            self.sendStatistics(self.pub_debug, 1)
 
 	# send out statistics with a certain frequency
         if ((self.change_period.event_ or self.change_delay.event_) and self.last_error_pub_ + self.pub_frequency < rospy.Time.now()) or self.last_pub_time + self.pub_frequency < rospy.Time.now():
-            self.sendStatistics()
+            self.sendStatistics(self.pub, 0)
 
 
