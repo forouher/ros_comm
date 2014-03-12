@@ -169,7 +169,6 @@ class ChangeDetector():
 	if self.L_ > L_limit or self.Lm_ < -L_limit:
 	    self.L_ = 0
 	    self.Lm_ = 0
-	    self.changes_ = self.changes_ + 1
 	    self.event_ = 1
 
 	# 4. z aktualisieren
@@ -291,6 +290,11 @@ class ConnectionStatisticsLogger():
             msg.period_mean = float('NaN')
 	    msg.period_variance = float('NaN')
             msg.period_max = float('NaN')
+
+        if self.change_period.event_:
+	    self.change_period.changes_ = self.change_period.changes_ + 1
+        if self.change_delay.event_:
+	    self.change_delay.changes_ = self.change_delay.changes_ + 1
 
 	msg.changes_delay = self.change_delay.changes_
 	msg.changes_period = self.change_period.changes_
