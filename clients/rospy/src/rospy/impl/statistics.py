@@ -161,10 +161,10 @@ class ChangeDetector():
 	e = z_t - self.z_
 
 	# 3. L_ in msg ausgeben, wenn zu gross ( evtl. senden enforcen)
-	X = numpy.std(self.e_)
-	L_limit = 50*X
-	self.L_ = max(0, self.L_ + e - 5*X)
-	self.Lm_ = max(0, self.Lm_ - e - 5*X)
+	X = max(0.005,numpy.std(self.e_))
+	L_limit = 10*X
+	self.L_ = max(0, self.L_ + e - X)
+	self.Lm_ = max(0, self.Lm_ - e - X)
 	if self.L_ > L_limit or self.Lm_ > L_limit:
 	    self.L_ = 0
 	    self.Lm_ = 0
@@ -268,7 +268,7 @@ class ConnectionStatisticsLogger():
 	if len(self.delay_list_)>0:
             msg.stamp_delay_mean = sum(self.delay_list_) / len(self.delay_list_)
 	    msg.stamp_delay_variance = sum((msg.stamp_delay_mean - value) ** 2 for value in self.delay_list_) / len(self.delay_list_)
-    	    msg.stamp_delay_max = max(self.delay_list_)
+    	    msg.stamp_delay_max = self.delay_list_[-1]
 	else:
             msg.stamp_delay_mean = float('NaN')
 	    msg.stamp_delay_variance = float('NaN')
@@ -279,7 +279,7 @@ class ConnectionStatisticsLogger():
 	    periods = [j-i for i, j in zip(self.arrival_time_list_[:-1], self.arrival_time_list_[1:])]
             msg.period_mean = sum(periods)/len(periods)
 	    msg.period_variance = sum((msg.period_mean - value) ** 2 for value in periods) / len(periods)
-            msg.period_max = max(periods)
+            msg.period_max = periods[-1]
 	else:
             msg.period_mean = float('NaN')
 	    msg.period_variance = float('NaN')

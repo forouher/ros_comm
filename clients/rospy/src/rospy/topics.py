@@ -704,7 +704,7 @@ class _SubscriberImpl(_TopicImpl):
 	    # /clock is special, as it is subscribed very early
 	    # also exclude /statistics. this shouldn't be necessary longterm,
 	    # but it reduces noise.
-	    if not self.name == "/clock" and not self.name == "/statistics":
+	    if not self.name == "/clock" and not self.name == "/statistics" and not self.name == "/statistics_dbg":
     		self.statistics_logger.callback(msg, connection.callerid_pub, connection.stat_bytes)
 
 class SubscribeListener(object):
