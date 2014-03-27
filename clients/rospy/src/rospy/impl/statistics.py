@@ -63,20 +63,22 @@ from rospy.exceptions import ROSSerializationException, TransportTerminated
 from rospy.msg import serialize_message, args_kwds_to_message
 from rosgraph_msgs.msg import TopicStatistics
 
+import numpy
+
 from rospy.impl.registration import get_topic_manager, set_topic_manager, Registration, get_registration_listeners
 from rospy.impl.tcpros import get_tcpros_handler, DEFAULT_BUFF_SIZE
 
 _logger = logging.getLogger('rospy.impl.statistics')
 
 # Range of window length, in seconds
-MAX_WINDOW = 64
-MIN_WINDOW = 4
+MAX_WINDOW = 1
+MIN_WINDOW = 1
 
 # Range of acceptable messages in window.
 # Window size will be adjusted if number of observed is
 # outside this range.
-MAX_ELEMENTS = 100
-MIN_ELEMENTS = 10
+MAX_ELEMENTS = 100000000
+MIN_ELEMENTS = 1
 
 # wrap genpy implementation and map it to rospy namespace
 import genpy
@@ -125,28 +127,76 @@ class SubscriberStatisticsLogger():
 	between publisher and subscriber and delegates to statistics logging to that
 	instance.
 	"""
-
         if not self.enabled:
-    	    return
+            return
 
-	# /clock is special, as it is subscribed very early
-	# also exclude /statistics to reduce noise.
-	if self.subscriber.name == "/clock" or self.subscriber.name == "/statistics":
-	    return
+        # /clock is special, as it is subscribed very early
+        # also exclude /statistics to reduce noise.
+        if self.subscriber.name == "/clock" or self.subscriber.name == "/statistics":
+            return
 
-	try:
-	    # create ConnectionStatisticsLogger for new connections
-	    logger = self.connections.get(publisher)
-	    if logger == None:
-		logger = ConnectionStatisticsLogger(self.subscriber.name, rospy.get_name(), publisher)
+        try:
+            # create ConnectionStatisticsLogger for new connections
+            logger = self.connections.get(publisher)
+            if logger == None:
+        	logger = ConnectionStatisticsLogger(self.subscriber.name, rospy.get_name(), publisher)
 		self.connections[publisher] = logger
 
-	    # delegate stuff to that instance
-    	    logger.callback(msg, stat_bytes)
-	except:
-	    ROS_ERROR("Unexpected error during statistics measurement: ", sys.exc_info()[0])
-	    pass
+            # delegate stuff to that instance
+            logger.callback(msg, stat_bytes)
 
+        except:
+            ROS_ERROR("Unexpected error during statistics measurement: ", sys.exc_info()[0])
+            pass
+
+
+class ChangeDetector():
+
+    def __init__(self, window_size):
+	self.wind_size_ = window_size
+	self.z_ = 0
+	self.e_ = [0]*self.wind_size_
+	self.x_ = [1]*self.wind_size_
+	self.L_ = 0
+	self.Lm_ = 0
+	self.event_ = 0
+	self.changes_ = 0
+        pass
+
+    # this is the change detection implementation.
+    # it is based on the "CUSUM RLS" algorithm from the book
+    # "Adaptive Filtering and Change Detection" by Gustafsson, 2000 (p. 69)
+    # please see that book for an more detailed explanation.
+    def update(self, z_t):
+
+	# calc error
+	e = z_t - self.z_
+
+	# "calming" offset to ignore temporary changes
+	# include lower limit in case the error has a very small variance.
+	X = max(0.005,numpy.std(self.e_))
+
+	# change threshold. we base it on the std deviation of the error
+	L_limit = 10*X
+
+	# now calculate L and Lm
+	self.L_ = max(0, self.L_ + e - X)
+	self.Lm_ = max(0, self.Lm_ - e - X)
+
+	# if one of them has passed the threshold, signal an event
+	if self.L_ > L_limit or self.Lm_ > L_limit:
+	    self.L_ = 0
+	    self.Lm_ = 0
+	    self.event_ = 1
+
+	# update window
+	# TODO down/upsampling
+	self.e_.pop(0)
+	self.e_.append(e)
+
+	# update learn rule
+	hl = 0.95
+	self.z_ = hl*self.z_ + (1-hl)*z_t
 
 class ConnectionStatisticsLogger():
     """
@@ -183,7 +233,8 @@ class ConnectionStatisticsLogger():
 
 	# reset window
 	self.last_pub_time = rospy.Time(0)
-	self.pub_frequency = rospy.Duration(4.0)
+	self.last_error_pub_ = rospy.Time(0)
+	self.pub_frequency = rospy.Duration(1.0)
 
         # timestamp delay
 	self.delay_list_ = []
@@ -195,12 +246,15 @@ class ConnectionStatisticsLogger():
         self.dropped_msgs_ = 0
 	self.window_start = rospy.Time.now()
 
+	self.change_period = ChangeDetector(20)
+	self.change_delay = ChangeDetector(20)
+
 	# temporary variables
 	self.stat_bytes_last_ = 0
 	self.stat_bytes_window_ = 0
         pass
 
-    def sendStatistics(self):
+    def sendStatistics(self, pub):
 	"""
 	Send out statistics. Aggregate collected stats information.
 
@@ -230,7 +284,7 @@ class ConnectionStatisticsLogger():
 	if len(self.delay_list_)>0:
             msg.stamp_delay_mean = sum(self.delay_list_) / len(self.delay_list_)
 	    msg.stamp_delay_variance = sum((msg.stamp_delay_mean - value) ** 2 for value in self.delay_list_) / len(self.delay_list_)
-    	    msg.stamp_delay_max = max(self.delay_list_)
+    	    msg.stamp_delay_max = self.delay_list_[-1]
 	else:
             msg.stamp_delay_mean = float('NaN')
 	    msg.stamp_delay_variance = float('NaN')
@@ -241,24 +295,38 @@ class ConnectionStatisticsLogger():
 	    periods = [j-i for i, j in zip(self.arrival_time_list_[:-1], self.arrival_time_list_[1:])]
             msg.period_mean = sum(periods)/len(periods)
 	    msg.period_variance = sum((msg.period_mean - value) ** 2 for value in periods) / len(periods)
-            msg.period_max = max(periods)
+            msg.period_max = periods[-1]
 	else:
             msg.period_mean = float('NaN')
 	    msg.period_variance = float('NaN')
             msg.period_max = float('NaN')
 
-        self.pub.publish(msg)
+    	if self.change_period.event_:
+	    self.change_period.changes_ = self.change_period.changes_ + 1
+    	if self.change_delay.event_:
+	    self.change_delay.changes_ = self.change_delay.changes_ + 1
 
-	# adjust window, if message count is not appropriate.
-	if len(self.arrival_time_list_) < MIN_ELEMENTS and self.pub_frequency*2 <= MAX_WINDOW:
-	    self.pub_frequency *= 2
-	if len(self.arrival_time_list_) > MAX_ELEMENTS and self.pub_frequency/2 >= MIN_WINDOW:
-	    self.pub_frequency /= 2
+	msg.changes_delay = self.change_delay.changes_
+	msg.changes_period = self.change_period.changes_
+
+        pub.publish(msg)
+
+	# adjust window, if message count is not appropriate.(TODO: disabled for error detection)
+#	if len(self.arrival_time_list_) < MIN_ELEMENTS and self.pub_frequency*2 <= MAX_WINDOW:
+#	    self.pub_frequency *= 2
+#	if len(self.arrival_time_list_) > MAX_ELEMENTS and self.pub_frequency/2 >= MIN_WINDOW:
+#	    self.pub_frequency /= 2
 
 	# clear collected stats, start new window.
 	self.delay_list_ = []
 	self.arrival_time_list_ = []
-        self.dropped_msgs_ = 0
+    	self.dropped_msgs_ = 0
+    	if self.change_period.event_ or self.change_delay.event_:
+	    self.last_error_pub_ = rospy.Time.now()
+	self.change_period.event_ = 0
+	self.change_delay.event_ = 0
+    	self.last_pub_time = rospy.Time.now()
+
 
     def callback(self,msg, stat_bytes):
         """
@@ -295,9 +363,14 @@ class ConnectionStatisticsLogger():
                 self.dropped_msgs_ = self.dropped_msgs_ + 1
     	    self.last_seq_ = msg.header.seq
 
+   	    self.change_delay.update(self.delay_list_[-1])
+
+	if len(self.arrival_time_list_) >= 2:
+	    z_t = rospy.Time.now().to_sec() - self.arrival_time_list_[-2]
+    	    self.change_period.update(z_t)
+
 	# send out statistics with a certain frequency
-        if self.last_pub_time + self.pub_frequency < rospy.Time.now():
-            self.last_pub_time = rospy.Time.now()
-            self.sendStatistics()
+        if ((self.change_period.event_ or self.change_delay.event_) and self.last_error_pub_ + self.pub_frequency < rospy.Time.now()) or self.last_pub_time + self.pub_frequency < rospy.Time.now():
+            self.sendStatistics(self.pub)
 
 
