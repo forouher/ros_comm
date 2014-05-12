@@ -37,6 +37,7 @@
 #include "ros/builtin_message_traits.h"
 #include "ros/serialization.h"
 #include "ros/message_event.h"
+#include "ros/memfd_event.h"
 #include <ros/static_assert.h>
 #include <ros/memfd_message.h>
 
