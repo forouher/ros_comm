@@ -210,7 +210,7 @@ def write_struct(s, spec, cpp_name_prefix, extra_deprecated_traits = {}):
 
     s.write('}; // struct %s\n'%(msg))
     
-    s.write('typedef %s_<boost::interprocess::ros_allocator< void, boost::interprocess::managed_external_buffer::segment_manager> > %s;\n\n'%(cpp_msg_base, msg))
+    s.write('typedef %s_<boost::interprocess::ros_allocator< void, boost::interprocess::managed_shared_memory::segment_manager> > %s;\n\n'%(cpp_msg_base, msg))
     s.write('typedef boost::shared_ptr<%s> %sPtr;\n'%(cpp_msg_base, msg))
     s.write('typedef boost::shared_ptr<%s const> %sConstPtr;\n\n'%(cpp_msg_base, msg))
 

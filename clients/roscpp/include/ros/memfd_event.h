@@ -99,8 +99,8 @@ struct DefaultMemfdMessageCreator
     ROS_ASSERT(m);
     ROS_ASSERT(m->size_==MemfdMessage::MAX_SIZE);
 
-    boost::interprocess::managed_external_buffer segment(boost::interprocess::open_only, m->buf_, m->size_);
-    M* msg = segment.find<M>("DATA").first;
+//    boost::interprocess::managed_external_buffer segment(boost::interprocess::open_only, m->buf_, m->size_);
+    M* msg = NULL; //segment.find<M>("DATA").first;
     ROS_ASSERT(msg != NULL);
     return  makeSharedPtrFromMessage<M>(msg, m);
   }
