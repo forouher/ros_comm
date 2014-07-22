@@ -52,7 +52,7 @@ public:
   virtual void drop();
   virtual std::string getTransportType();
   virtual std::string getTransportInfo();
-  virtual bool isIntraprocess() { return false; }
+  virtual bool isShmem() { return true; }
   virtual void getPublishTypes(bool& ser, bool& nocopy, bool& shmem, const std::type_info& ti);
 
 private:

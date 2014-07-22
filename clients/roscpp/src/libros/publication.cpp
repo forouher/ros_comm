@@ -163,10 +163,10 @@ bool Publication::enqueueMessage(const SerializedMessage& m)
     return false;
   }
 
-  ROS_ASSERT(m.buf || m.memfd_message);
+  ROS_ASSERT(m.buf);
 
   uint32_t seq = incrementSequence();
-  if (has_header_ && m.buf)
+  if (has_header_)
   {
     // If we have a header, we know it's immediately after the message length
     // Deserialize it, write the sequence, and then serialize it again.
@@ -182,14 +182,13 @@ bool Publication::enqueueMessage(const SerializedMessage& m)
   for(V_SubscriberLink::iterator i = subscriber_links_.begin();
       i != subscriber_links_.end(); ++i)
   {
-    const SubscriberLinkPtr& sub_link = (*i);
-/*    if (!sub_link->isShmem()) */
-      sub_link->enqueueMessage(m, true, false);
+    const SubscriberLinkPtr& sub = (*i);
+    if (!sub->isIntraprocess() && !sub->isShmem())
+      sub->enqueueMessage(m, true, false);
   }
 
   if (latch_)
   {
-    ROS_DEBUG("Storing message for latching");
     last_message_ = m;
   }
 
@@ -407,7 +406,9 @@ bool Publication::hasSubscribers()
 
 void Publication::publish(SerializedMessage& m)
 {
-  if (m.message || m.memfd_message || !m.uuid.is_nil())
+
+  bool do_serialize = false;
+  if (m.message || !m.uuid.is_nil())
   {
     boost::mutex::scoped_lock lock(subscriber_links_mutex_);
     V_SubscriberLink::const_iterator it = subscriber_links_.begin();
@@ -415,24 +416,21 @@ void Publication::publish(SerializedMessage& m)
     for (; it != end; ++it)
     {
       const SubscriberLinkPtr& sub = *it;
-      if ((m.message && sub->isIntraprocess()) || !m.uuid.is_nil())
-      {
-        sub->enqueueMessage(m, false, true);
-      }
 
-/*    // This looks like a good idea, but it is unreliable.
-      // maybe there are threading issues?
-      if (m.memfd_message && sub->isShmem())
+      if (sub->isIntraprocess() || sub->isShmem())
       {
         sub->enqueueMessage(m, false, true);
       }
-*/
+      else
+      {
+        do_serialize = true;
+      }
     }
 
     m.message.reset();
   }
 
-  if (m.uuid.is_nil() && (m.buf || m.memfd_message))
+  if (do_serialize)
   {
     boost::mutex::scoped_lock lock(publish_queue_mutex_);
     publish_queue_.push_back(m);

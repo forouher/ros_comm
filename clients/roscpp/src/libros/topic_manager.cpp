@@ -805,7 +805,7 @@ void TopicManager::publish(const std::string& topic, const boost::function<Seria
       serialize = true;
       nocopy = false;
     }
-//    fprintf(stderr,"C s=%i, n=%i,sm=%i\n", serialize, nocopy, shmem);
+    fprintf(stderr,"C s=%i, n=%i, sm=%i\n", serialize, nocopy, shmem);
 
     if (!nocopy)
     {
@@ -818,12 +818,14 @@ void TopicManager::publish(const std::string& topic, const boost::function<Seria
     }
 
     // TODO: latching will not work yet, as messages cannot be sent twice
+/*
     if ((shmem || p->isLatching()) && m.uuid.is_nil()) {
       SerializedMessage m2 = shmemSerfunc();
       m.memfd_message = m2.memfd_message;
       ROS_ASSERT(m.memfd_message);
       ROS_ASSERT(m.memfd_message->buf_);
     }
+*/
 
     if (serialize || p->isLatching())
     {
