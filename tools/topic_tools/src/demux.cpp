@@ -41,6 +41,7 @@
 #include "topic_tools/DemuxDelete.h"
 #include "topic_tools/shape_shifter.h"
 #include "topic_tools/parse.h"
+#include "ros/datatypes.h"
 
 using std::string;
 using std::vector;
@@ -233,7 +234,7 @@ bool del_topic_cb(topic_tools::DemuxDelete::Request& req,
 
 int main(int argc, char **argv)
 {
-  vector<string> args;
+  ros::V_string args;
   ros::removeROSArgs(argc, (const char**)argv, args);
 
   if (args.size() < 3)
