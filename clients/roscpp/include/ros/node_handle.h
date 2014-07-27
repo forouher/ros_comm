@@ -395,6 +395,20 @@ if (handle)
     ops.transport_hints = transport_hints;
     return subscribe(ops);
   }
+/*
+  Subscriber subscribe2(const std::string& topic, uint32_t queue_size, 
+                       void(T::*fp)(const typename M::IPtr&), T* obj, 
+                       const TransportHints& transport_hints = TransportHints())
+*/
+  template<class M, class T>
+  Subscriber subscribe3(const std::string& topic, uint32_t queue_size, void(T::*fp)(M), T* obj, 
+                       const TransportHints& transport_hints = TransportHints())
+  {
+    SubscribeOptions ops;
+    ops.template initByFullCallbackType2<M>(topic, queue_size, boost::bind(fp, obj, _1));
+    ops.transport_hints = transport_hints;
+    return subscribe(ops);
+  }
 
   /**
    * \brief Subscribe to a topic, version for class member function with bare pointer
@@ -447,6 +461,17 @@ if (handle)
   template<class M, class T>
   Subscriber subscribe(const std::string& topic, uint32_t queue_size, 
                        void(T::*fp)(const boost::shared_ptr<M const>&) const, T* obj, 
+                       const TransportHints& transport_hints = TransportHints())
+  {
+    SubscribeOptions ops;
+    ops.template init<M>(topic, queue_size, boost::bind(fp, obj, _1));
+    ops.transport_hints = transport_hints;
+    return subscribe(ops);
+  }
+
+  template<class M, class T>
+  Subscriber subscribe2(const std::string& topic, uint32_t queue_size, 
+                       void(T::*fp)(const typename M::IPtr&), T* obj, 
                        const TransportHints& transport_hints = TransportHints())
   {
     SubscribeOptions ops;

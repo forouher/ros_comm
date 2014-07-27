@@ -30,6 +30,8 @@
 #include "ros/message_deserializer.h"
 #include "ros/subscription_callback_helper.h"
 
+#include <boost/uuid/uuid.hpp>
+
 namespace ros
 {
 
@@ -148,9 +150,10 @@ CallbackInterface::CallResult SubscriptionQueue::call()
   }
 
   VoidConstPtr msg = i.deserializer->deserialize();
+  // in theory we can retrieve the IPC shared_ptr from the queue, thus skipping the deserialize
 
   // msg can be null here if deserialization failed
-  if (msg)
+  if (msg || !i.deserializer->getUuid().is_nil())
   {
     try
     {
@@ -160,8 +163,13 @@ CallbackInterface::CallResult SubscriptionQueue::call()
     {}
 
     SubscriptionCallbackHelperCallParams params;
-    params.event = MessageEvent<void const>(msg, i.deserializer->getConnectionHeader(), i.receipt_time, i.nonconst_need_copy, MessageEvent<void const>::CreateFunction());
-    i.helper->call(params);
+    if (i.deserializer->getUuid().is_nil()) { 
+        params.event = MessageEvent<void const>(msg, i.deserializer->getConnectionHeader(), i.receipt_time, i.nonconst_need_copy, MessageEvent<void const>::CreateFunction());
+        i.helper->call(params);
+    } else {
+        params.event2 = MessageEvent2<void const>(i.deserializer->getUuid(), i.deserializer->getConnectionHeader(), i.receipt_time, i.nonconst_need_copy, MessageEvent2<void const>::CreateFunction());
+        i.helper->call(params);
+    }
   }
 
   return CallbackInterface::Success;

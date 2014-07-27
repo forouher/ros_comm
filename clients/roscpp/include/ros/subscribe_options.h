@@ -91,6 +91,23 @@ struct ROSCPP_DECL SubscribeOptions
     helper = SubscriptionCallbackHelperPtr(new SubscriptionCallbackHelperT<P>(_callback, factory_fn));
   }
 
+  typedef boost::interprocess::managed_shared_memory::segment_manager segment_manager_type;
+  typedef boost::interprocess::ros_allocator< void, segment_manager_type> void_allocator_type;
+
+
+  template<class P>
+  void initByFullCallbackType2(const std::string& _topic, uint32_t _queue_size,
+       const boost::function<void (P)>& _callback,
+       const boost::function<boost::interprocess::shared_ptr<typename ParameterAdapter<P>::Message, void_allocator_type, boost::interprocess::deleter< typename ParameterAdapter<P>::Message, segment_manager_type> >(void) >& factory_fn = DefaultShmemMessageCreator<typename ParameterAdapter<P>::Message>())
+  {
+    typedef typename ParameterAdapter<P>::Message MessageType;
+    topic = _topic;
+    queue_size = _queue_size;
+    md5sum = message_traits::md5sum<MessageType>();
+    datatype = message_traits::datatype<MessageType>();
+    helper = SubscriptionCallbackHelperPtr(new SubscriptionCallbackHelperT2<P>(_callback, factory_fn));
+  }
+
   /**
    * \brief Templated initialization, templated on message type.  Only supports "const boost::shared_ptr<M const>&" callback types
    * \param _topic Topic to subscribe on
@@ -110,6 +127,19 @@ struct ROSCPP_DECL SubscribeOptions
     md5sum = message_traits::md5sum<MessageType>();
     datatype = message_traits::datatype<MessageType>();
     helper = SubscriptionCallbackHelperPtr(new SubscriptionCallbackHelperT<const boost::shared_ptr<MessageType const>&>(_callback, factory_fn));
+  }
+
+  template<class M>
+  void initShmem(const std::string& _topic, uint32_t _queue_size,
+       const boost::function<void (const typename M::IPtr&)>& _callback,
+       const boost::function<boost::shared_ptr<M>(void)>& factory_fn = DefaultMessageCreator<M>())
+  {
+    typedef typename ParameterAdapter<M>::Message MessageType;
+    topic = _topic;
+    queue_size = _queue_size;
+    md5sum = message_traits::md5sum<MessageType>();
+    datatype = message_traits::datatype<MessageType>();
+//    helper = SubscriptionCallbackHelperPtr(new SubscriptionCallbackHelperT<const typename M::IPtr>(_callback));
   }
 
   std::string topic;                                                ///< Topic to subscribe to

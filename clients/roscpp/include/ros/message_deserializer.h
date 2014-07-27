@@ -33,6 +33,8 @@
 
 #include <ros/serialized_message.h>
 
+#include <boost/uuid/uuid.hpp>
+
 #include <boost/thread/mutex.hpp>
 #include <boost/shared_array.hpp>
 
@@ -49,6 +51,8 @@ public:
 
   VoidConstPtr deserialize();
   const boost::shared_ptr<M_string>& getConnectionHeader() { return connection_header_; }
+
+  const boost::uuids::uuid& getUuid() { return serialized_message_.uuid; }
 
 private:
   SubscriptionCallbackHelperPtr helper_;

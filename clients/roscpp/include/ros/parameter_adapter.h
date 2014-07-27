@@ -35,6 +35,8 @@
 #include <boost/type_traits/add_const.hpp>
 #include <boost/type_traits/remove_const.hpp>
 #include <boost/type_traits/remove_reference.hpp>
+#include <boost/interprocess/managed_shared_memory.hpp>
+#include <boost/interprocess/smart_ptr/shared_ptr.hpp>
 
 namespace ros
 {
@@ -104,6 +106,29 @@ struct ParameterAdapter<const boost::shared_ptr<M>& >
   static Parameter getParameter(const Event& event)
   {
     return ros::MessageEvent<Message>(event).getMessage();
+  }
+};
+
+typedef boost::interprocess::managed_shared_memory::segment_manager segment_manager_type2;
+typedef boost::interprocess::ros_allocator< void, segment_manager_type2> void_allocator_type2;
+
+template<typename M>
+struct ParameterAdapter<const boost::interprocess::shared_ptr< M, void_allocator_type2, boost::interprocess::deleter< M, segment_manager_type2> >& >
+{
+  typedef typename boost::remove_reference<typename boost::remove_const<M>::type>::type Message;
+  typedef ros::MessageEvent<Message const> Event;
+  typedef ros::MessageEvent2<Message> Event2;
+  typedef boost::shared_ptr<Message> Parameter;
+  typedef boost::interprocess::shared_ptr<Message, void_allocator_type2, boost::interprocess::deleter< M, segment_manager_type2> > Parameter2;
+  static const bool is_const = false;
+
+  static Parameter getParameter(const Event& event)
+  {
+    return ros::MessageEvent<Message>(event).getMessage();
+  }
+  static Parameter2 getParameter2(const Event2& event)
+  {
+    return ros::MessageEvent2<Message>(event).getMessage();
   }
 };
 

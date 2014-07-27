@@ -419,6 +419,7 @@ void Publication::publish(SerializedMessage& m)
 
       if (sub->isIntraprocess() || sub->isShmem())
       {
+        // TODO: i have to send a unique shared_ptr object/ref to each shmem subscriber
         sub->enqueueMessage(m, false, true);
       }
       else

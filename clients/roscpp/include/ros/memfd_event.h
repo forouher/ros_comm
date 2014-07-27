@@ -45,6 +45,11 @@
 #include <boost/make_shared.hpp>
 #include <ros/message_factory.h>
 
+#include <boost/interprocess/managed_shared_memory.hpp>
+#include <boost/interprocess/smart_ptr/deleter.hpp>
+#include <boost/interprocess/smart_ptr/shared_ptr.hpp>
+
+
 namespace ros
 {
 
@@ -109,12 +114,35 @@ struct DefaultMemfdMessageCreator
 template<typename M>
 struct DefaultShmemMessageCreator
 {
-  boost::shared_ptr<M> operator()(const boost::uuids::uuid uuid)
+  typedef boost::interprocess::managed_shared_memory::segment_manager segment_manager_type;
+  typedef boost::interprocess::ros_allocator< void, segment_manager_type> void_allocator_type;
+
+  typedef boost::interprocess::shared_ptr<M, void_allocator_type, boost::interprocess::deleter< M, segment_manager_type> > NonConstTypePtr;
+
+  NonConstTypePtr operator()()
   {
-    M* msg = MessageFactory::findMessage<M>(uuid);
+    NonConstTypePtr msg = MessageFactory::createSharedMessage<M>();
     ROS_ASSERT(msg != NULL);
-    return boost::shared_ptr<M>(msg, &DeleterShmem<M>);
+    return msg;
   }
+
+};
+
+template<typename M>
+struct DefaultShmemMessageFinder
+{
+  typedef boost::interprocess::managed_shared_memory::segment_manager segment_manager_type;
+  typedef boost::interprocess::ros_allocator< void, segment_manager_type> void_allocator_type;
+
+  typedef boost::interprocess::shared_ptr<M, void_allocator_type, boost::interprocess::deleter< M, segment_manager_type> > NonConstTypePtr;
+
+  NonConstTypePtr operator()(const boost::uuids::uuid uuid)
+  {
+    NonConstTypePtr* msg = MessageFactory::findMessage<M>(uuid);
+    ROS_ASSERT(msg != NULL);
+    return *msg;
+  }
+
 };
 
 
