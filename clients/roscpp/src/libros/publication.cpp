@@ -407,7 +407,7 @@ bool Publication::hasSubscribers()
 void Publication::publish(SerializedMessage& m)
 {
 
-  bool do_serialize = false;
+  bool do_serialize = (m.buf != NULL); // TODO: this shit is all fucked up
   if (m.message || !m.uuid.is_nil())
   {
     boost::mutex::scoped_lock lock(subscriber_links_mutex_);
