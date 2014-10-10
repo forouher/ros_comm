@@ -112,6 +112,9 @@ private:
 namespace ros {
 namespace message_traits {
 
+template <> struct IsShmemReady<topic_tools::ShapeShifter> : FalseType { };
+template <> struct IsShmemReady<const topic_tools::ShapeShifter> : FalseType { };
+
 template <> struct IsMessage<topic_tools::ShapeShifter> : TrueType { };
 template <> struct IsMessage<const topic_tools::ShapeShifter> : TrueType { };
 

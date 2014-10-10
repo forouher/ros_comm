@@ -144,8 +144,8 @@ public:
     ss << "[" << msg->file << ":" << msg->line << "(" << msg->function << ") ";
 
     ss << "[topics: ";
-    std::vector<std::string>::const_iterator it = msg->topics.begin();
-    std::vector<std::string>::const_iterator end = msg->topics.end();
+    ros::V_string::const_iterator it = msg->topics.begin();
+    ros::V_string::const_iterator end = msg->topics.end();
     for ( ; it != end; ++it )
     {
       const std::string& topic = *it;
