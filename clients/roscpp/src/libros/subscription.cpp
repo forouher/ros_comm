@@ -43,6 +43,7 @@
 #include "ros/subscription.h"
 #include "ros/publication.h"
 #include "ros/transport_publisher_link.h"
+#include "ros/kdbus_transport_publisher_link.h"
 #include "ros/intraprocess_publisher_link.h"
 #include "ros/intraprocess_subscriber_link.h"
 #include "ros/connection.h"
@@ -58,6 +59,9 @@
 #include "ros/file_log.h"
 #include "ros/transport_hints.h"
 #include "ros/subscription_callback_helper.h"
+#include <boost/uuid/uuid.hpp>            // uuid class
+#include <boost/uuid/uuid_generators.hpp> // generators
+#include <boost/uuid/uuid_io.hpp>
 
 #include <boost/make_shared.hpp>
 
@@ -336,10 +340,19 @@ bool Subscription::pubUpdate(const V_string& new_pubs)
   return retval;
 }
 
+std::string Subscription::replaceStrChar(std::string str, char ch1, char ch2) {
+
+  for (int i = 0; i < str.length(); ++i) {
+    if (str[i] == ch1)
+      str[i] = ch2;
+  }
+  return str;
+}
+
 bool Subscription::negotiateConnection(const std::string& xmlrpc_uri)
 {
   XmlRpcValue tcpros_array, protos_array, params;
-  XmlRpcValue udpros_array;
+  XmlRpcValue udpros_array, kdbusros_array;
   TransportUDPPtr udp_transport;
   int protos = 0;
   V_string transports = transport_hints_.getTransports();
@@ -375,11 +388,25 @@ bool Subscription::negotiateConnection(const std::string& xmlrpc_uri)
       udpros_array[4] = max_datagram_size;
 
       protos_array[protos++] = udpros_array;
+      ROS_DEBUG("Adding UDP as proto offer");
     }
     else if (*it == "TCP")
     {
       tcpros_array[0] = std::string("TCPROS");
       protos_array[protos++] = tcpros_array;
+      ROS_DEBUG("Adding TCP as proto offer");
+    }
+    else if (*it == "KDBus")
+    {
+      if(!access( "/dev/kdbus/control", R_OK | W_OK )) {
+        boost::uuids::uuid uuid = boost::uuids::random_generator()();
+        std::string my_endpoint_name = "ros.uuid_" + replaceStrChar(boost::uuids::to_string(uuid), '-', '_');
+        kdbusros_array[0] = std::string("KDBusROS");
+        kdbusros_array[1] = my_endpoint_name;
+        protos_array[protos++] = kdbusros_array;
+        ROS_DEBUG("kdbus offer endpoint name '%s'",boost::uuids::to_string(uuid).c_str());
+        ROS_DEBUG("Adding KDBus as proto offer");
+      }
     }
     else
     {
@@ -526,6 +553,30 @@ void Subscription::pendingConnectionDone(const PendingConnectionPtr& conn, XmlRp
     	ROSCPP_LOG_DEBUG("Failed to connect to publisher of topic [%s] at [%s:%d]", name_.c_str(), pub_host.c_str(), pub_port);
     }
   }
+  else if (proto_name == "KDBusROS")
+  {
+    if (proto.size() != 3 ||
+        proto[1].getType() != XmlRpcValue::TypeString ||
+        proto[2].getType() != XmlRpcValue::TypeString)
+    {
+    	ROSCPP_LOG_DEBUG("publisher implements KdbusROS, but the " \
+                "parameters aren't string (size)");
+      return;
+    }
+
+    ROSCPP_LOG_DEBUG("Connecting via kdbusros to topic [%s]", name_.c_str());
+    KdbusTransportPublisherLinkPtr pub_link(new KdbusTransportPublisherLink(shared_from_this(), xmlrpc_uri, transport_hints_));
+
+    std::string my_endpoint_name = proto[1];
+    std::string caller_id = proto[2];
+    ROS_DEBUG("kdbus endpoint name '%s'",my_endpoint_name.c_str());
+    pub_link->initialize(my_endpoint_name, caller_id);
+
+    boost::mutex::scoped_lock lock(publisher_links_mutex_);
+    addPublisherLink(pub_link);
+
+    ROSCPP_LOG_DEBUG("Connected to publisher of topic [%s]", name_.c_str());
+  }
   else if (proto_name == "UDPROS")
   {
     if (proto.size() != 6 ||
@@ -604,6 +655,8 @@ uint32_t Subscription::handleMessage(const SerializedMessage& m, bool ser, bool 
   // garbage to the messages with different C++ types than the first one.
   cached_deserializers_.clear();
 
+  SerializedMessage m2 = m;
+
   ros::Time receipt_time = ros::Time::now();
 
   for (V_CallbackInfo::iterator cb = callbacks_.begin();
@@ -615,7 +668,7 @@ uint32_t Subscription::handleMessage(const SerializedMessage& m, bool ser, bool 
 
     const std::type_info* ti = &info->helper_->getTypeInfo();
 
-    if ((nocopy && m.type_info && *ti == *m.type_info) || (ser && (!m.type_info || *ti != *m.type_info)))
+    if (m.memfd_message || (nocopy && m.type_info && *ti == *m.type_info) || (ser && (!m.type_info || *ti != *m.type_info)))
     {
       MessageDeserializerPtr deserializer;
 
@@ -634,6 +687,12 @@ uint32_t Subscription::handleMessage(const SerializedMessage& m, bool ser, bool 
       {
         deserializer = boost::make_shared<MessageDeserializer>(info->helper_, m, connection_header);
         cached_deserializers_.push_back(std::make_pair(ti, deserializer));
+
+        // this is an ugly hack to have a deserialized memfd message for statistics
+        // there must be a better way to do this...
+        if (!m2.message && m.memfd_message)
+            m2.message = deserializer->deserialize();
+
       }
 
       bool was_full = false;
@@ -657,7 +716,7 @@ uint32_t Subscription::handleMessage(const SerializedMessage& m, bool ser, bool 
   }
 
   // measure statistics
-  statistics_.callback(connection_header, name_, link->getCallerID(), m, link->getStats().bytes_received_, receipt_time, drops > 0);
+  statistics_.callback(connection_header, name_, link->getCallerID(), m2, link->getStats().bytes_received_, receipt_time, drops > 0);
 
   // If this link is latched, store off the message so we can immediately pass it to new subscribers later
   if (link->isLatched())

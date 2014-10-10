@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, Morgan Quigley and Willow Garage, Inc.
+ * Copyright (C) 2014 Dariush Forouher
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -8,7 +8,7 @@
  *   * Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- *   * Neither the names of Stanford University or Willow Garage, Inc. nor the names of its
+ *   * Neither the names of Willow Garage, Inc. nor the names of its
  *     contributors may be used to endorse or promote products derived from
  *     this software without specific prior written permission.
  *
@@ -25,45 +25,50 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_INTRAPROCESS_SUBSCRIBER_LINK_H
-#define ROSCPP_INTRAPROCESS_SUBSCRIBER_LINK_H
-#include "subscriber_link.h"
-#include "common.h"
+#ifndef ROSCPP_MEMFD_SERIALIZE_H
+#define ROSCPP_MEMFD_SERIALIZE_H
 
-#include <boost/thread/recursive_mutex.hpp>
+#include <sys/mman.h>
+
+#include <boost/utility/enable_if.hpp>
+#include <boost/interprocess/managed_external_buffer.hpp>
+
+#include <ros/transport/memfd_message.h>
+#include <ros/forwards.h>
+#include <ros/common.h>
+#include <ros/serialized_message.h>
+#include <ros/boost_container.h>
+#include <ros/message_factory.h>
+#include <ros/parameter_adapter.h>
+#include "ros/message_traits.h"
 
 namespace ros
 {
 
-class IntraProcessPublisherLink;
-typedef boost::shared_ptr<IntraProcessPublisherLink> IntraProcessPublisherLinkPtr;
-
-/**
- * \brief SubscriberLink handles broadcasting messages to a single subscriber on a single topic
- */
-class ROSCPP_DECL IntraProcessSubscriberLink : public SubscriberLink
+template<typename P>
+inline typename boost::enable_if<ros::message_traits::IsShmemReady<typename ParameterAdapter<P>::Message>, SerializedMessage >::type kdbusCloneMessage(const P& new_msg)
 {
-public:
-  IntraProcessSubscriberLink(const PublicationPtr& parent);
-  virtual ~IntraProcessSubscriberLink();
+    typedef typename ParameterAdapter<P>::Message NonConstType;
 
-  void setSubscriber(const IntraProcessPublisherLinkPtr& subscriber);
-  bool isLatching();
+    // TODO: what about a message that is large than the default size?
+    typename NonConstType::Ptr bare_msg = ros::make_shared<NonConstType>();
+    *bare_msg = new_msg;
 
-  virtual void enqueueMessage(const SerializedMessage& m, bool ser, bool nocopy);
-  virtual void drop();
-  virtual std::string getTransportType();
-  virtual std::string getTransportInfo();
-  virtual bool isIntraprocess() { return true; }
-  virtual void getPublishTypes(bool& ser, bool& nocopy, bool& shmem, const std::type_info& ti);
+    SerializedMessage ret;
+    ret.message = bare_msg;
+    ret.memfd_message = ros::MessageFactory::getMemfdMessage(ret.message);
+    return ret;
+}
 
-private:
-  IntraProcessPublisherLinkPtr subscriber_;
-  bool dropped_;
-  boost::recursive_mutex drop_mutex_;
-};
-typedef boost::shared_ptr<IntraProcessSubscriberLink> IntraProcessSubscriberLinkPtr;
+template<typename P>
+inline typename boost::disable_if<ros::message_traits::IsShmemReady<typename ParameterAdapter<P>::Message>, SerializedMessage >::type kdbusCloneMessage(const P& new_msg)
+{
+    ROS_ASSERT_MSG(false, "Should never be called.");
+    SerializedMessage ret;
+    return ret;
+}
 
-} // namespace ros
+}
 
-#endif // ROSCPP_INTRAPROCESS_SUBSCRIBER_LINK_H
+#endif // ROSCPP_MEMFD_SERIALIZE_H
+

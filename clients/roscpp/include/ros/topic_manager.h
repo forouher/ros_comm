@@ -32,6 +32,7 @@
 #include "common.h"
 #include "ros/serialization.h"
 #include "rosout_appender.h"
+#include <ros/transport/memfd_serialize.h>
 
 #include "XmlRpcValue.h"
 
@@ -124,10 +125,10 @@ public:
     using namespace serialization;
 
     SerializedMessage m;
-    publish(topic, boost::bind(serializeMessage<M>, boost::ref(message)), m);
+    publish(topic, boost::bind(serializeMessage<M>, boost::ref(message)), boost::bind(kdbusCloneMessage<M>, boost::ref(message)), m);
   }
 
-  void publish(const std::string &_topic, const boost::function<SerializedMessage(void)>& serfunc, SerializedMessage& m);
+  void publish(const std::string &_topic, const boost::function<SerializedMessage(void)>& serfunc, const boost::function<SerializedMessage(void)>& kdbusCloneFunc, SerializedMessage& m);
 
   void incrementSequence(const std::string &_topic);
   bool isLatched(const std::string& topic);
@@ -207,7 +208,7 @@ private:
    *
    * @return true on success, false otherwise.
    */
-  bool pubUpdate(const std::string &topic, const std::vector<std::string> &pubs);
+  bool pubUpdate(const std::string &topic, const ros::V_string &pubs);
 
   void pubUpdateCallback(XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result);
   void requestTopicCallback(XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result);

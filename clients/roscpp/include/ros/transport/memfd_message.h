@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, Morgan Quigley and Willow Garage, Inc.
+ * Copyright (C) 2014 Dariush Forouher
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -8,7 +8,7 @@
  *   * Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- *   * Neither the names of Stanford University or Willow Garage, Inc. nor the names of its
+ *   * Neither the names of Willow Garage, Inc. nor the names of its
  *     contributors may be used to endorse or promote products derived from
  *     this software without specific prior written permission.
  *
@@ -25,45 +25,42 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_INTRAPROCESS_SUBSCRIBER_LINK_H
-#define ROSCPP_INTRAPROCESS_SUBSCRIBER_LINK_H
-#include "subscriber_link.h"
-#include "common.h"
+#ifndef ROSCPP_MEMFDMESSAGE_H
+#define ROSCPP_MEMFDMESSAGE_H
 
-#include <boost/thread/recursive_mutex.hpp>
+#include <ros/forwards.h>
+#include <ros/common.h>
+
+#include <sys/mman.h>
 
 namespace ros
 {
 
-class IntraProcessPublisherLink;
-typedef boost::shared_ptr<IntraProcessPublisherLink> IntraProcessPublisherLinkPtr;
-
-/**
- * \brief SubscriberLink handles broadcasting messages to a single subscriber on a single topic
- */
-class ROSCPP_DECL IntraProcessSubscriberLink : public SubscriberLink
+class MemfdMessage
 {
-public:
-  IntraProcessSubscriberLink(const PublicationPtr& parent);
-  virtual ~IntraProcessSubscriberLink();
-
-  void setSubscriber(const IntraProcessPublisherLinkPtr& subscriber);
-  bool isLatching();
-
-  virtual void enqueueMessage(const SerializedMessage& m, bool ser, bool nocopy);
-  virtual void drop();
-  virtual std::string getTransportType();
-  virtual std::string getTransportInfo();
-  virtual bool isIntraprocess() { return true; }
-  virtual void getPublishTypes(bool& ser, bool& nocopy, bool& shmem, const std::type_info& ti);
 
 private:
-  IntraProcessPublisherLinkPtr subscriber_;
-  bool dropped_;
-  boost::recursive_mutex drop_mutex_;
+
+  MemfdMessage()
+    : fd_(-1), size_(0), buf_(NULL) {};
+
+public:
+
+  typedef boost::shared_ptr<MemfdMessage> Ptr;
+
+  MemfdMessage(int fd, void* buf, size_t size);
+  ~MemfdMessage();
+
+
+  int fd_;
+  size_t size_;
+  void* buf_;
+
+  static size_t MAX_SIZE;
+
 };
-typedef boost::shared_ptr<IntraProcessSubscriberLink> IntraProcessSubscriberLinkPtr;
 
-} // namespace ros
+}
 
-#endif // ROSCPP_INTRAPROCESS_SUBSCRIBER_LINK_H
+#endif // ROSCPP_MEMFDMESSAGE_H
+

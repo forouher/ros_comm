@@ -120,14 +120,14 @@ void IntraProcessSubscriberLink::drop()
   }
 }
 
-void IntraProcessSubscriberLink::getPublishTypes(bool& ser, bool& nocopy, const std::type_info& ti)
+void IntraProcessSubscriberLink::getPublishTypes(bool& ser, bool& nocopy, bool& shmem, const std::type_info& ti)
 {
   boost::recursive_mutex::scoped_lock lock(drop_mutex_);
   if (dropped_)
   {
     return;
   }
-
+  shmem = false;
   subscriber_->getPublishTypes(ser, nocopy, ti);
 }
 

@@ -99,8 +99,12 @@ add_library(roscpp
   src/libros/transport/transport.cpp
   src/libros/transport/transport_udp.cpp
   src/libros/transport/transport_tcp.cpp
+  src/libros/transport/transport_kdbus.cpp
+  src/libros/transport/memfd_message.cpp
   src/libros/subscriber_link.cpp
   src/libros/service_client_link.cpp
+  src/libros/kdbus_transport_publisher_link.cpp
+  src/libros/kdbus_transport_subscriber_link.cpp
   src/libros/transport_publisher_link.cpp
   src/libros/transport_subscriber_link.cpp
   src/libros/service_manager.cpp

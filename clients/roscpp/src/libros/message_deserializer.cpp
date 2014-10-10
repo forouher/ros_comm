@@ -59,7 +59,14 @@ VoidConstPtr MessageDeserializer::deserialize()
     return msg_;
   }
 
-  if (!serialized_message_.buf && serialized_message_.num_bytes > 0)
+  if (serialized_message_.memfd_message) {
+    SubscriptionCallbackHelperDeserializeParams params;
+    params.memfd_message = serialized_message_.memfd_message;
+    msg_ = helper_->deserializeKdbus(params);
+    return msg_;
+  }
+
+  if (!serialized_message_.buf)
   {
     // If the buffer has been reset it means we tried to deserialize and failed
     return VoidConstPtr();

@@ -68,6 +68,7 @@ public:
   const TransportUDPPtr& getUDPServerTransport() { return udpserver_transport_; }
 
   void udprosIncomingConnection(const TransportUDPPtr& transport, Header& header);
+  void addKdbusConnection(const std::string& topic, const std::string& client_con_name);
 
   void start();
   void shutdown();

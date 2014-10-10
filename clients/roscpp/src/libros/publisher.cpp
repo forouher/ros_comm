@@ -30,6 +30,9 @@
 #include "ros/node_handle.h"
 #include "ros/topic_manager.h"
 
+#include <sys/mman.h>
+#include <sys/ioctl.h>
+
 namespace ros
 {
 
@@ -75,7 +78,7 @@ Publisher::~Publisher()
 {
 }
 
-void Publisher::publish(const boost::function<SerializedMessage(void)>& serfunc, SerializedMessage& m) const
+void Publisher::publish(const boost::function<SerializedMessage(void)>& serfunc, const boost::function<SerializedMessage(void)>& shmemSerfunc, SerializedMessage& m) const
 {
   if (!impl_)
   {
@@ -89,7 +92,7 @@ void Publisher::publish(const boost::function<SerializedMessage(void)>& serfunc,
     return;
   }
 
-  TopicManager::instance()->publish(impl_->topic_, serfunc, m);
+  TopicManager::instance()->publish(impl_->topic_, serfunc, shmemSerfunc, m);
 }
 
 void Publisher::incrementSequence() const

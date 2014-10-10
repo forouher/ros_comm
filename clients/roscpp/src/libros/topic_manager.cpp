@@ -40,6 +40,7 @@
 #include "ros/init.h"
 #include "ros/file_log.h"
 #include "ros/subscribe_options.h"
+#include "ros/message_factory.h"
 
 #include "XmlRpc.h"
 
@@ -52,6 +53,9 @@ using namespace std; // sigh
 
 namespace ros
 {
+
+std::map<const void*, MemfdMessage::Ptr> null_deleter::map_;
+boost::mutex null_deleter::mutex_;
 
 TopicManagerPtr g_topic_manager;
 boost::mutex g_topic_manager_mutex;
@@ -491,7 +495,7 @@ bool TopicManager::registerSubscriber(const SubscriptionPtr& s, const string &da
     return false;
   }
 
-  vector<string> pub_uris;
+  ros::V_string pub_uris;
   for (int i = 0; i < payload.size(); i++)
   {
     if (payload[i] != xmlrpc_manager_->getServerURI())
@@ -553,7 +557,7 @@ bool TopicManager::unregisterSubscriber(const string &topic)
   return true;
 }
 
-bool TopicManager::pubUpdate(const string &topic, const vector<string> &pubs)
+bool TopicManager::pubUpdate(const string &topic, const ros::V_string &pubs)
 {
   SubscriptionPtr sub;
   {
@@ -612,7 +616,43 @@ bool TopicManager::requestTopic(const string &topic,
     }
 
     string proto_name = proto[0];
-    if (proto_name == string("TCPROS"))
+
+    if (proto_name == string("KDBusROS"))
+    {
+      if (proto.size() != 2 ||
+	  proto[1].getType() != XmlRpcValue::TypeString)
+      {
+      	ROSCPP_LOG_DEBUG("Invalid protocol parameters for KDBusROS");
+        return false;
+      }
+
+      if(access( "/dev/kdbus/control", R_OK | W_OK ))
+        return false;
+
+      // TODO: compare hostnames, abort if not equal
+
+      // TODO: check if publisher type is isShmemReady
+
+      // TODO: compare type_infos. abort if not equal
+      //std::string sub_type = proto[2];
+      //PublicationPtr p = lookupPublication(topic);
+
+      XmlRpcValue kdbusros_params;
+      kdbusros_params[0] = "KDBusROS";
+      kdbusros_params[1] = proto[1]; // mirror back uuid
+      kdbusros_params[2] = this_node::getName();
+      ret[0] = int(1);
+      ret[1] = string();
+      ret[2] = kdbusros_params;
+
+      std::string sub_conn_id = proto[1];
+
+      // add this connection endpoint name to the list of ids we send messages to.
+      connection_manager_->addKdbusConnection(topic, sub_conn_id);
+
+      return true;
+    }
+    else if (proto_name == string("TCPROS"))
     {
       XmlRpcValue tcpros_params;
       tcpros_params[0] = string("TCPROS");
@@ -702,7 +742,7 @@ bool TopicManager::requestTopic(const string &topic,
   return false;
 }
 
-void TopicManager::publish(const std::string& topic, const boost::function<SerializedMessage(void)>& serfunc, SerializedMessage& m)
+void TopicManager::publish(const std::string& topic, const boost::function<SerializedMessage(void)>& serfunc, const boost::function<SerializedMessage(void)>& kdbusCloneFunc, SerializedMessage& m)
 {
   boost::recursive_mutex::scoped_lock lock(advertised_topics_mutex_);
 
@@ -720,23 +760,45 @@ void TopicManager::publish(const std::string& topic, const boost::function<Seria
     // do a no-copy publish.
     bool nocopy = false;
     bool serialize = false;
+    bool shmem = false;
+
+    // TODO: this is ugly. we have to check if the links support kdbus. but this method is not callable
+    // in all situations. so we have to call it twice. 
+    p->getPublishTypes(serialize, nocopy, shmem, typeid(void));
+    serialize = false;
+    nocopy = false;
+
+    if (shmem && !ros::MessageFactory::isKdbusMessage(m.message)) {
+        SerializedMessage m2 = kdbusCloneFunc();
+        m.message = m2.message;
+        m.memfd_message = m2.memfd_message;
+        ROS_ASSERT_MSG(m.memfd_message, "Could not create memfd message in TopicManager. This is a bug.");
+    }
+
+    if (shmem && !m.memfd_message) {
+        m.memfd_message = ros::MessageFactory::getMemfdMessage(m.message);
+    }
 
     // We can only do a no-copy publish if a shared_ptr to the message is provided, and we have type information for it
-    if (m.type_info && m.message)
+    if ((m.type_info && m.message) || m.memfd_message)
     {
-      p->getPublishTypes(serialize, nocopy, *m.type_info);
+      p->getPublishTypes(serialize, nocopy, shmem, *m.type_info);
     }
     else
     {
       serialize = true;
+      nocopy = false;
     }
 
-    if (!nocopy)
+    ROS_DEBUG("TopicManager::publish s=%i, n=%i, sm=%i, message=%p", serialize, nocopy, shmem, m.message.get());
+
+    if (!shmem && !nocopy)
     {
       m.message.reset();
       m.type_info = 0;
     }
 
+    // TODO: latching&kdbus will not work yet.
     if (serialize || p->isLatching())
     {
       SerializedMessage m2 = serfunc();
@@ -749,7 +811,7 @@ void TopicManager::publish(const std::string& topic, const boost::function<Seria
 
     // If we're not doing a serialized publish we don't need to signal the pollset.  The write()
     // call inside signal() is actually relatively expensive when doing a nocopy publish.
-    if (serialize)
+    if (serialize || shmem)
     {
       poll_manager_->getPollSet().signal();
     }
@@ -1006,10 +1068,10 @@ extern std::string console::g_last_error_message;
 
 void TopicManager::pubUpdateCallback(XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
 {
-  std::vector<std::string> pubs;
+  V_string pubs;
   for (int idx = 0; idx < params[2].size(); idx++)
   {
-    pubs.push_back(params[2][idx]);
+    pubs.push_back((std::string)params[2][idx]);
   }
   if (pubUpdate(params[1], pubs))
   {

@@ -137,7 +137,7 @@ public:
     {
       ROS_ERROR("Exception thrown while processing service call: %s", e.what());
       std_msgs::String error_string;
-      error_string.data = e.what();
+      error_string.data = (std::string)e.what();
       SerializedMessage res = serialization::serializeServiceResponse(false, error_string);
       link_->processResponse(false, res);
       return Invalid;

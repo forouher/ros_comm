@@ -32,6 +32,7 @@
 #include "ros/single_subscriber_publisher.h"
 #include "ros/serialization.h"
 #include <std_msgs/Header.h>
+#include <ros/transport/memfd_message.h>
 
 namespace ros
 {
@@ -182,7 +183,8 @@ bool Publication::enqueueMessage(const SerializedMessage& m)
       i != subscriber_links_.end(); ++i)
   {
     const SubscriberLinkPtr& sub_link = (*i);
-    sub_link->enqueueMessage(m, true, false);
+    if (!sub_link->isIntraprocess() && !sub_link->isShmem())
+      sub_link->enqueueMessage(m, true, false);
   }
 
   if (latch_)
@@ -211,7 +213,7 @@ void Publication::addSubscriberLink(const SubscriberLinkPtr& sub_link)
     }
   }
 
-  if (latch_ && last_message_.buf)
+  if (latch_ && last_message_.buf && last_message_.memfd_message->buf_)
   {
     sub_link->enqueueMessage(last_message_, true, true);
   }
@@ -373,7 +375,7 @@ uint32_t Publication::getNumSubscribers()
   return (uint32_t)subscriber_links_.size();
 }
 
-void Publication::getPublishTypes(bool& serialize, bool& nocopy, const std::type_info& ti)
+void Publication::getPublishTypes(bool& serialize, bool& nocopy, bool& shmem, const std::type_info& ti)
 {
   boost::mutex::scoped_lock lock(subscriber_links_mutex_);
   V_SubscriberLink::const_iterator it = subscriber_links_.begin();
@@ -383,11 +385,13 @@ void Publication::getPublishTypes(bool& serialize, bool& nocopy, const std::type
     const SubscriberLinkPtr& sub = *it;
     bool s = false;
     bool n = false;
-    sub->getPublishTypes(s, n, ti);
+    bool sm = false;
+    sub->getPublishTypes(s, n, sm, ti);
     serialize = serialize || s;
     nocopy = nocopy || n;
+    shmem = shmem || sm;
 
-    if (serialize && nocopy)
+    if (serialize && nocopy && shmem)
     {
       break;
     }
@@ -402,6 +406,7 @@ bool Publication::hasSubscribers()
 
 void Publication::publish(SerializedMessage& m)
 {
+  bool do_serialize = (m.buf != NULL); // TODO: bloody hack
   if (m.message)
   {
     boost::mutex::scoped_lock lock(subscriber_links_mutex_);
@@ -410,16 +415,21 @@ void Publication::publish(SerializedMessage& m)
     for (; it != end; ++it)
     {
       const SubscriberLinkPtr& sub = *it;
-      if (sub->isIntraprocess())
+
+      if (sub->isIntraprocess() || sub->isShmem())
       {
         sub->enqueueMessage(m, false, true);
+      }
+      else
+      {
+        do_serialize = true;
       }
     }
 
     m.message.reset();
   }
 
-  if (m.buf)
+  if (do_serialize)
   {
     boost::mutex::scoped_lock lock(publish_queue_mutex_);
     publish_queue_.push_back(m);

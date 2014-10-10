@@ -38,6 +38,8 @@
 #include "ros/serialization.h"
 #include "ros/message_event.h"
 #include <ros/static_assert.h>
+#include <ros/transport/memfd_message.h>
+#include <ros/message_factory.h>
 
 #include <boost/type_traits/add_const.hpp>
 #include <boost/type_traits/remove_const.hpp>
@@ -54,6 +56,7 @@ struct SubscriptionCallbackHelperDeserializeParams
   uint8_t* buffer;
   uint32_t length;
   boost::shared_ptr<M_string> connection_header;
+  MemfdMessage::Ptr memfd_message;
 };
 
 struct ROSCPP_DECL SubscriptionCallbackHelperCallParams
@@ -71,10 +74,12 @@ class ROSCPP_DECL SubscriptionCallbackHelper
 public:
   virtual ~SubscriptionCallbackHelper() {}
   virtual VoidConstPtr deserialize(const SubscriptionCallbackHelperDeserializeParams&) = 0;
+  virtual VoidConstPtr deserializeKdbus(const SubscriptionCallbackHelperDeserializeParams&) = 0;
   virtual void call(SubscriptionCallbackHelperCallParams& params) = 0;
   virtual const std::type_info& getTypeInfo() = 0;
   virtual bool isConst() = 0;
   virtual bool hasHeader() = 0;
+  virtual const std_msgs::Header* getHeader(const boost::shared_ptr<void const> msg) = 0;
 };
 typedef boost::shared_ptr<SubscriptionCallbackHelper> SubscriptionCallbackHelperPtr;
 
@@ -115,6 +120,13 @@ public:
      return message_traits::hasHeader<typename ParameterAdapter<P>::Message>();
   }
 
+  virtual const std_msgs::Header* getHeader(const boost::shared_ptr<void const> msg)
+  {
+     NonConstType *p = (NonConstType*)(msg.get());
+     std_msgs::Header* h = ros::message_traits::Header<NonConstType>::pointer(*p);
+     return h;
+  }
+
   virtual VoidConstPtr deserialize(const SubscriptionCallbackHelperDeserializeParams& params)
   {
     namespace ser = serialization;
@@ -137,6 +149,24 @@ public:
 
     return VoidConstPtr(msg);
   }
+
+  virtual VoidConstPtr deserializeKdbus(const SubscriptionCallbackHelperDeserializeParams& params)
+  {
+    VoidConstPtr msg;
+
+    ROS_ASSERT(params.memfd_message.get());
+
+    msg = ros::MessageFactory::retrieveKdbusMessage<NonConstType>(params.memfd_message);
+
+    if (!msg)
+    {
+      ROS_DEBUG("Allocation failed for message of type [%s]", getTypeInfo().name());
+      return msg;
+    }
+
+    return msg;
+  }
+
 
   virtual void call(SubscriptionCallbackHelperCallParams& params)
   {

@@ -29,6 +29,7 @@
 #include "ros/poll_manager.h"
 #include "ros/connection.h"
 #include "ros/transport_subscriber_link.h"
+#include "ros/kdbus_transport_subscriber_link.h"
 #include "ros/service_client_link.h"
 #include "ros/transport/transport_tcp.h"
 #include "ros/transport/transport_udp.h"
@@ -201,6 +202,12 @@ void ConnectionManager::tcprosAcceptConnection(const TransportTCPPtr& transport)
   addConnection(conn);
 
   conn->initialize(transport, true, boost::bind(&ConnectionManager::onConnectionHeaderReceived, this, _1, _2));
+}
+
+void ConnectionManager::addKdbusConnection(const std::string& topic, const std::string& client_con_name)
+{
+  KdbusTransportSubscriberLinkPtr sub_link(new KdbusTransportSubscriberLink());
+  sub_link->initialize(topic, client_con_name);
 }
 
 bool ConnectionManager::onConnectionHeaderReceived(const ConnectionPtr& conn, const Header& header)

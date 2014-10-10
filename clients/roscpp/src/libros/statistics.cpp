@@ -42,6 +42,7 @@ StatisticsLogger::StatisticsLogger()
 }
 
 void StatisticsLogger::init(const SubscriptionCallbackHelperPtr& helper) {
+  helper_ = helper;
   hasHeader_ = helper->hasHeader();
   param::param("/enable_statistics", enable_statistics, false);
   param::param("/statistics_window_min_elements", min_elements, 10);
@@ -91,7 +92,8 @@ void StatisticsLogger::callback(const boost::shared_ptr<M_string>& connection_he
 
   // try to extract header, if the message has one. this fails sometimes,
   // therefore the try-catch
-  if (hasHeader_)
+  ROS_DEBUG("Statistics: header=%i, m.message_start=%p, m.message=%p", hasHeader_, m.message_start, m.message.get());
+  if (hasHeader_ && m.message_start)
   {
     try
     {
@@ -105,6 +107,10 @@ void StatisticsLogger::callback(const boost::shared_ptr<M_string>& connection_he
       ROS_DEBUG("Error during header extraction for statistics (topic=%s, message_length=%li)", topic.c_str(), m.num_bytes - (m.message_start - m.buf.get()));
       hasHeader_ = false;
     }
+  } else if (hasHeader_ && m.message) {
+    const std_msgs::Header* header = helper_->getHeader(m.message);
+    ROS_ASSERT_MSG(header, "Statistics: could not get message header. strange...");
+    stats.age_list.push_back(received_time - header->stamp);
   }
 
   // should publish new statistics?

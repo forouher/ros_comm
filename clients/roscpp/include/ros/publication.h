@@ -92,7 +92,7 @@ public:
    */
   uint32_t getNumSubscribers();
 
-  void getPublishTypes(bool& serialize, bool& nocopy, const std::type_info& ti);
+  void getPublishTypes(bool& serialize, bool& nocopy, bool& shmem, const std::type_info& ti);
 
   /**
    * \brief Returns the name of the topic this publication broadcasts to
